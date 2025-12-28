@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { CalendarDays, Plus, Clock, Bike, Store } from "lucide-react";
-import AdminSidebar from "@/components/AdminSidebar";
 import { format } from "date-fns";
 
 
@@ -36,7 +35,6 @@ const MOCK_DATA: { [key: string]: CalendarData } = {
 };
 
 export default function CalendarPage() {
-    const [open, setOpen] = useState(false);
     const today = new Date(2025, 6, 30); // Jul 30, 2025
     const [selectedDate, setSelectedDate] = useState(today.toDateString());
 
@@ -45,7 +43,6 @@ export default function CalendarPage() {
 
     return (
         <div className="p-6 bg-white rounded-xl shadow">
-            <AdminSidebar open={open} onClose={() => setOpen(false)} />
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
                     <CalendarDays className="w-5 h-5 text-yellow-500" />

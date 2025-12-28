@@ -1,10 +1,11 @@
 import { ButtonHTMLAttributes } from "react";
 
-export function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+export function Button({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
     return (
         <button
             {...props}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium px-4 py-2 rounded transition-colors duration-200"
+            className={`px-4 py-2 text-sm font-medium rounded transition-colors duration-200 ${className || 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}
         />
     );
 }
+
