@@ -122,6 +122,8 @@ export interface Restaurant {
     background_url?: string;
     gst_certificate_url?: string;
     fssai_license_url?: string;
+    aadhaar_card_url?: string;
+    pan_card_url?: string;
     street_address: string;
     city: string;
     state: string;
@@ -172,8 +174,11 @@ export interface RestaurantFilters {
 export interface UpdateRestaurantRequest {
     name?: string;
     owner_name?: string;
+    slug?: string;
     type?: string;
     category?: string;
+    gst_number?: string;
+    fssai_number?: string;
     street_address?: string;
     city?: string;
     state?: string;
@@ -187,6 +192,15 @@ export interface UpdateRestaurantRequest {
     is_qrunch_purchased?: boolean;
     is_qrunch_requested?: boolean;
     is_restaurant_registered?: boolean;
+}
+
+export interface UpdateRestaurantFiles {
+    logo_url?: File;
+    background_url?: File;
+    gst_certificate_url?: File;
+    fssai_license_url?: File;
+    aadhaar_card_url?: File;
+    pan_card_url?: File;
 }
 
 export interface CreateRoleRequest {
@@ -457,9 +471,71 @@ export const restaurantApi = {
         }, RESTAURANT_API_BASE_URL);
     },
 
-    // Patch restaurant (partial update)
-    patch: async (id: number, data: Partial<UpdateRestaurantRequest>): Promise<{ status: string; message: string }> => {
-        return apiRequest<{ status: string; message: string }>(`/restaurants/${id}`, {
+    // Patch restaurant (partial update with optional file uploads)
+    patch: async (
+        id: number,
+        data: Partial<UpdateRestaurantRequest>,
+        files?: Partial<UpdateRestaurantFiles>
+    ): Promise<{ status: string; statusCode: number; message: string; data?: any }> => {
+        // If files are provided, use FormData (multipart/form-data)
+        if (files && Object.keys(files).length > 0) {
+            const formData = new FormData();
+
+            // Add all text fields to FormData
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    formData.append(key, String(value));
+                }
+            });
+
+            // Add files to FormData
+            Object.entries(files).forEach(([key, file]) => {
+                if (file) {
+                    formData.append(key, file);
+                }
+            });
+
+            // Make request without Content-Type header (browser sets it with boundary)
+            const token = getAuthToken();
+            const headers: HeadersInit = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${RESTAURANT_API_BASE_URL}/restaurants/${id}`, {
+                method: 'PATCH',
+                headers,
+                body: formData,
+            });
+
+            if (response.status === 401) {
+                if (typeof window !== 'undefined') {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('auth_user');
+                    if (!window.location.pathname.includes('/login')) {
+                        window.location.href = '/login?error=Session expired. Please login again.';
+                    }
+                }
+                throw new Error("Unauthorized: Session expired.");
+            }
+
+            if (!response.ok) {
+                const text = await response.text();
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = JSON.parse(text);
+                    errorMessage = errorData.message || errorData.error || errorMessage;
+                } catch (e) {
+                    if (text) errorMessage = text;
+                }
+                throw new Error(errorMessage);
+            }
+
+            return response.json();
+        }
+
+        // Otherwise, use JSON (application/json)
+        return apiRequest<{ status: string; statusCode: number; message: string; data?: any }>(`/restaurants/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }, RESTAURANT_API_BASE_URL);

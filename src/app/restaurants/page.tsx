@@ -7,7 +7,7 @@ import {
     CheckCircle, XCircle, RefreshCw
 } from "lucide-react";
 import Modal from "@/components/Modal";
-import { restaurantApi, Restaurant, RestaurantFilters, UpdateRestaurantRequest } from "@/lib/api";
+import { restaurantApi, Restaurant, RestaurantFilters, UpdateRestaurantRequest, UpdateRestaurantFiles } from "@/lib/api";
 
 export default function RestaurantsPage() {
     // State
@@ -28,8 +28,13 @@ export default function RestaurantsPage() {
     const [isRegisteredFilter, setIsRegisteredFilter] = useState("");
     const [totalItems, setTotalItems] = useState(0);
 
+    // View filter for different restaurant lists
+    type ViewFilter = 'all' | 'recent' | 'unregistered' | 'no-qrunch' | 'qrunch-requested';
+    const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
+
     // Edit form
     const [editForm, setEditForm] = useState<UpdateRestaurantRequest>({});
+    const [editFiles, setEditFiles] = useState<Partial<UpdateRestaurantFiles>>({});
 
     // Loading and messages
     const [loading, setLoading] = useState(false);
@@ -70,6 +75,41 @@ export default function RestaurantsPage() {
         }
     }, [successMessage]);
 
+    // Apply view filter to restaurants
+    const applyViewFilter = useCallback((restaurantList: Restaurant[]): Restaurant[] => {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        switch (viewFilter) {
+            case 'recent':
+                return restaurantList.filter(r => new Date(r.created_at || '') >= sevenDaysAgo);
+            case 'unregistered':
+                return restaurantList.filter(r => r.is_restaurant_registered === false);
+            case 'no-qrunch':
+                return restaurantList.filter(r => r.is_qrunch_purchased === false);
+            case 'qrunch-requested':
+                return restaurantList.filter(r => r.is_qrunch_requested === true && r.is_qrunch_purchased === false);
+            default:
+                return restaurantList;
+        }
+    }, [viewFilter]);
+
+    // Get filtered restaurants
+    const filteredRestaurants = applyViewFilter(restaurants);
+
+    // Calculate statistics
+    const stats = {
+        total: restaurants.length,
+        recent: restaurants.filter(r => {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            return new Date(r.created_at || '') >= sevenDaysAgo;
+        }).length,
+        unregistered: restaurants.filter(r => r.is_restaurant_registered === false).length,
+        noQrunch: restaurants.filter(r => r.is_qrunch_purchased === false).length,
+        qrunchRequested: restaurants.filter(r => r.is_qrunch_requested === true && r.is_qrunch_purchased === false).length,
+    };
+
     // Handlers
     const handleSearch = () => {
         setFilters(prev => ({ ...prev, page: 1 }));
@@ -94,30 +134,41 @@ export default function RestaurantsPage() {
         setEditForm({
             name: restaurant.name,
             owner_name: restaurant.owner_name,
+            slug: restaurant.slug,
             type: restaurant.type,
             category: restaurant.category,
+            gst_number: restaurant.gst_number,
+            fssai_number: restaurant.fssai_number,
             street_address: restaurant.street_address,
             city: restaurant.city,
             state: restaurant.state,
             postal_code: restaurant.postal_code,
+            latitude: restaurant.latitude,
+            longitude: restaurant.longitude,
             status: restaurant.status,
             upi_vpa: restaurant.upi_vpa,
+            phone: restaurant.phone,
+            description: restaurant.description,
             is_qrunch_purchased: restaurant.is_qrunch_purchased,
+            is_qrunch_requested: restaurant.is_qrunch_requested,
             is_restaurant_registered: restaurant.is_restaurant_registered,
         });
+        setEditFiles({});
         setIsEditModalOpen(true);
     };
 
     const handleUpdateRestaurant = async () => {
         if (!selectedRestaurant) return;
         setLoading(true);
+        setError(null);
         try {
-            await restaurantApi.patch(selectedRestaurant.id, editForm);
+            await restaurantApi.patch(selectedRestaurant.id, editForm, editFiles);
             setSuccessMessage("Restaurant updated successfully!");
             setIsEditModalOpen(false);
+            setEditFiles({});
             fetchRestaurants();
-        } catch (err) {
-            setError("Failed to update restaurant");
+        } catch (err: any) {
+            setError(err.message || "Failed to update restaurant");
         } finally {
             setLoading(false);
         }
@@ -181,6 +232,89 @@ export default function RestaurantsPage() {
                     {successMessage}
                 </div>
             )}
+
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div
+                    onClick={() => setViewFilter('all')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${viewFilter === 'all'
+                        ? 'bg-yellow-50 border-yellow-500 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-yellow-300'
+                        }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Total</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
+                        </div>
+                        <Store className={viewFilter === 'all' ? 'text-yellow-500' : 'text-gray-400'} size={32} />
+                    </div>
+                </div>
+
+                <div
+                    onClick={() => setViewFilter('recent')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${viewFilter === 'recent'
+                        ? 'bg-blue-50 border-blue-500 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-blue-300'
+                        }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Recent (7d)</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.recent}</p>
+                        </div>
+                        <RefreshCw className={viewFilter === 'recent' ? 'text-blue-500' : 'text-gray-400'} size={32} />
+                    </div>
+                </div>
+
+                <div
+                    onClick={() => setViewFilter('unregistered')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${viewFilter === 'unregistered'
+                        ? 'bg-orange-50 border-orange-500 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-orange-300'
+                        }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Not Registered</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.unregistered}</p>
+                        </div>
+                        <XCircle className={viewFilter === 'unregistered' ? 'text-orange-500' : 'text-gray-400'} size={32} />
+                    </div>
+                </div>
+
+                <div
+                    onClick={() => setViewFilter('no-qrunch')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${viewFilter === 'no-qrunch'
+                        ? 'bg-red-50 border-red-500 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-red-300'
+                        }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">No Qrunch</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.noQrunch}</p>
+                        </div>
+                        <AlertCircle className={viewFilter === 'no-qrunch' ? 'text-red-500' : 'text-gray-400'} size={32} />
+                    </div>
+                </div>
+
+                <div
+                    onClick={() => setViewFilter('qrunch-requested')}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${viewFilter === 'qrunch-requested'
+                        ? 'bg-purple-50 border-purple-500 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-purple-300'
+                        }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Requested</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.qrunchRequested}</p>
+                        </div>
+                        <CheckCircle className={viewFilter === 'qrunch-requested' ? 'text-purple-500' : 'text-gray-400'} size={32} />
+                    </div>
+                </div>
+            </div>
 
             {/* Filters */}
             <div className="bg-white rounded-xl shadow p-4">
@@ -282,7 +416,7 @@ export default function RestaurantsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
-                                    {restaurants.length === 0 ? (
+                                    {filteredRestaurants.length === 0 ? (
                                         <tr>
                                             <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                                                 <Store className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -290,7 +424,7 @@ export default function RestaurantsPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        restaurants.map((restaurant) => (
+                                        filteredRestaurants.map((restaurant) => (
                                             <tr key={restaurant.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
@@ -516,135 +650,392 @@ export default function RestaurantsPage() {
                 title={selectedRestaurant ? "Edit Restaurant" : "Add Restaurant"}
                 maxWidth="3xl"
             >
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                            <input
-                                type="text"
-                                value={editForm.name || ""}
-                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            />
+                <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
+                    {/* Basic Information */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b pb-2">Basic Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant Name *</label>
+                                <input
+                                    type="text"
+                                    value={editForm.name || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="My Restaurant"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
+                                <input
+                                    type="text"
+                                    value={editForm.owner_name || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, owner_name: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="John Doe"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                                <input
+                                    type="text"
+                                    value={editForm.slug || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, slug: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="my-restaurant"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                <select
+                                    value={editForm.type || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                >
+                                    <option value="Veg">Veg</option>
+                                    <option value="Non-Veg">Non-Veg</option>
+                                    <option value="Both">Both</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <input
+                                    type="text"
+                                    value={editForm.category || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="North Indian, Chinese, etc."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                <input
+                                    type="tel"
+                                    value={editForm.phone || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="+91 1234567890"
+                                />
+                            </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name</label>
-                            <input
-                                type="text"
-                                value={editForm.owner_name || ""}
-                                onChange={(e) => setEditForm({ ...editForm, owner_name: e.target.value })}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <textarea
+                                value={editForm.description || ""}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                            <select
-                                value={editForm.type || ""}
-                                onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            >
-                                <option value="restaurant">Restaurant</option>
-                                <option value="cafe">Cafe</option>
-                                <option value="cloud_kitchen">Cloud Kitchen</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                            <input
-                                type="text"
-                                value={editForm.category || ""}
-                                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
-                        <input
-                            type="text"
-                            value={editForm.street_address || ""}
-                            onChange={(e) => setEditForm({ ...editForm, street_address: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                            <input
-                                type="text"
-                                value={editForm.city || ""}
-                                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                            <input
-                                type="text"
-                                value={editForm.state || ""}
-                                onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-                            <input
-                                type="text"
-                                value={editForm.postal_code || ""}
-                                onChange={(e) => setEditForm({ ...editForm, postal_code: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                            <select
-                                value={editForm.status || ""}
-                                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
-                            >
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="pending">Pending</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">UPI VPA</label>
-                            <input
-                                type="text"
-                                value={editForm.upi_vpa || ""}
-                                onChange={(e) => setEditForm({ ...editForm, upi_vpa: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                rows={2}
+                                placeholder="Brief description of the restaurant"
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="flex items-center gap-2">
+                    {/* Legal & Compliance */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b pb-2">Legal & Compliance</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">GST Number</label>
+                                <input
+                                    type="text"
+                                    value={editForm.gst_number || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, gst_number: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="07AAAAA0000A1Z5"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">FSSAI Number</label>
+                                <input
+                                    type="text"
+                                    value={editForm.fssai_number || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, fssai_number: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="12345678901234"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b pb-2">Location</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
                             <input
-                                type="checkbox"
-                                checked={editForm.is_qrunch_purchased || false}
-                                onChange={(e) => setEditForm({ ...editForm, is_qrunch_purchased: e.target.checked })}
-                                className="rounded text-yellow-500 focus:ring-yellow-500"
+                                type="text"
+                                value={editForm.street_address || ""}
+                                onChange={(e) => setEditForm({ ...editForm, street_address: e.target.value })}
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                placeholder="123, Main Street"
                             />
-                            <span className="text-sm text-gray-700">Qrunch Purchased</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={editForm.is_restaurant_registered || false}
-                                onChange={(e) => setEditForm({ ...editForm, is_restaurant_registered: e.target.checked })}
-                                className="rounded text-yellow-500 focus:ring-yellow-500"
-                            />
-                            <span className="text-sm text-gray-700">Restaurant Registered</span>
-                        </label>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                <input
+                                    type="text"
+                                    value={editForm.city || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="New Delhi"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                <input
+                                    type="text"
+                                    value={editForm.state || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="Delhi"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                                <input
+                                    type="text"
+                                    value={editForm.postal_code || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, postal_code: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="110001"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={editForm.latitude || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, latitude: parseFloat(e.target.value) || undefined })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="28.6139"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={editForm.longitude || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, longitude: parseFloat(e.target.value) || undefined })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="77.2090"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* File Uploads */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b pb-2">File Uploads</h3>
+                        <p className="text-xs text-gray-500">Accepted formats: jpg, png, webp, pdf. Max size: 10MB per file.</p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
+                                {selectedRestaurant?.logo_url && (
+                                    <p className="text-xs text-gray-500 mb-1">Current: {selectedRestaurant.logo_url.split('/').pop()}</p>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.webp"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 10 * 1024 * 1024) {
+                                                setError("Logo file size must be less than 10MB");
+                                                e.target.value = '';
+                                            } else {
+                                                setEditFiles({ ...editFiles, logo_url: file });
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Background Image</label>
+                                {selectedRestaurant?.background_url && (
+                                    <p className="text-xs text-gray-500 mb-1">Current: {selectedRestaurant.background_url.split('/').pop()}</p>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.webp"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 10 * 1024 * 1024) {
+                                                setError("Background file size must be less than 10MB");
+                                                e.target.value = '';
+                                            } else {
+                                                setEditFiles({ ...editFiles, background_url: file });
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">GST Certificate</label>
+                                {selectedRestaurant?.gst_certificate_url && (
+                                    <p className="text-xs text-gray-500 mb-1">Current: {selectedRestaurant.gst_certificate_url.split('/').pop()}</p>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 10 * 1024 * 1024) {
+                                                setError("File size must be less than 10MB");
+                                                e.target.value = '';
+                                            } else {
+                                                setEditFiles({ ...editFiles, gst_certificate_url: file });
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">FSSAI License</label>
+                                {selectedRestaurant?.fssai_license_url && (
+                                    <p className="text-xs text-gray-500 mb-1">Current: {selectedRestaurant.fssai_license_url.split('/').pop()}</p>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 10 * 1024 * 1024) {
+                                                setError("File size must be less than 10MB");
+                                                e.target.value = '';
+                                            } else {
+                                                setEditFiles({ ...editFiles, fssai_license_url: file });
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar Card</label>
+                                {selectedRestaurant?.aadhaar_card_url && (
+                                    <p className="text-xs text-gray-500 mb-1">Current: {selectedRestaurant.aadhaar_card_url.split('/').pop()}</p>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 10 * 1024 * 1024) {
+                                                setError("File size must be less than 10MB");
+                                                e.target.value = '';
+                                            } else {
+                                                setEditFiles({ ...editFiles, aadhaar_card_url: file });
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">PAN Card</label>
+                                {selectedRestaurant?.pan_card_url && (
+                                    <p className="text-xs text-gray-500 mb-1">Current: {selectedRestaurant.pan_card_url.split('/').pop()}</p>
+                                )}
+                                <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            if (file.size > 10 * 1024 * 1024) {
+                                                setError("File size must be less than 10MB");
+                                                e.target.value = '';
+                                            } else {
+                                                setEditFiles({ ...editFiles, pan_card_url: file });
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 text-sm"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Status & Payment */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b pb-2">Status & Payment</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select
+                                    value={editForm.status || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                >
+                                    <option value="active">Active</option>
+                                    <option value="closed">Closed</option>
+                                    <option value="pending">Pending</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">UPI VPA</label>
+                                <input
+                                    type="text"
+                                    value={editForm.upi_vpa || ""}
+                                    onChange={(e) => setEditForm({ ...editForm, upi_vpa: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="restaurant@upi"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={editForm.is_qrunch_purchased || false}
+                                    onChange={(e) => setEditForm({ ...editForm, is_qrunch_purchased: e.target.checked })}
+                                    className="rounded text-yellow-500 focus:ring-yellow-500"
+                                />
+                                <span className="text-sm text-gray-700">Qrunch Purchased</span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={editForm.is_qrunch_requested || false}
+                                    onChange={(e) => setEditForm({ ...editForm, is_qrunch_requested: e.target.checked })}
+                                    className="rounded text-yellow-500 focus:ring-yellow-500"
+                                />
+                                <span className="text-sm text-gray-700">Qrunch Requested</span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={editForm.is_restaurant_registered || false}
+                                    onChange={(e) => setEditForm({ ...editForm, is_restaurant_registered: e.target.checked })}
+                                    className="rounded text-yellow-500 focus:ring-yellow-500"
+                                />
+                                <span className="text-sm text-gray-700">Restaurant Registered</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -657,7 +1048,11 @@ export default function RestaurantsPage() {
                         {loading ? "Saving..." : "Save Changes"}
                     </button>
                     <button
-                        onClick={() => setIsEditModalOpen(false)}
+                        onClick={() => {
+                            setIsEditModalOpen(false);
+                            setEditFiles({});
+                            setError(null);
+                        }}
                         className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                     >
                         Cancel
