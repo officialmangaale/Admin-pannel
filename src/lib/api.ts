@@ -1,8 +1,18 @@
 // API Service Layer for Food Admin
-// Base URL for the backend API
+import { HTTP_STATUS } from './constants';
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL || "http://13.204.68.5:8080";
-const RESTAURANT_API_BASE_URL = process.env.NEXT_PUBLIC_RESTAURANT_API_BASE_URL || "http://13.204.68.5:8082";
+// Validate environment variables at module load
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const RESTAURANT_API_BASE_URL = process.env.NEXT_PUBLIC_RESTAURANT_API_BASE_URL;
+
+if (!AUTH_API_BASE_URL || !RESTAURANT_API_BASE_URL) {
+    throw new Error(
+        'Missing required environment variables. Please set:\n' +
+        '- NEXT_PUBLIC_AUTH_API_BASE_URL\n' +
+        '- NEXT_PUBLIC_RESTAURANT_API_BASE_URL\n' +
+        'See .env.example for details.'
+    );
+}
 
 // Types
 export interface User {
@@ -231,21 +241,47 @@ export interface LoginRequest {
     password: string;
 }
 
-// Helper function to get auth token
+// Helper function to get auth token from cookie or localStorage
+// Note: Preferably use httpOnly cookies for production
 const getAuthToken = (): string | null => {
     if (typeof window !== 'undefined') {
+        // For now, check localStorage (TODO: migrate to httpOnly cookies)
         return localStorage.getItem('auth_token');
     }
     return null;
+};
+
+// Helper function to get CSRF token from cookie
+const getCsrfToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+
+    const cookies = document.cookie.split(';');
+    const csrfCookie = cookies.find(cookie => cookie.trim().startsWith('csrf_token='));
+    return csrfCookie ? csrfCookie.split('=')[1] : null;
+};
+
+// Sanitize string inputs to prevent injection attacks
+const sanitizeInput = (input: string): string => {
+    return input.replace(/[<>"'&]/g, (char) => {
+        const escapeMap: Record<string, string> = {
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '&': '&amp;',
+        };
+        return escapeMap[char] || char;
+    });
 };
 
 // Helper function for API requests
 async function apiRequest<T>(
     endpoint: string,
     options: RequestInit = {},
-    baseUrl: string = AUTH_API_BASE_URL
+    baseUrl: string = AUTH_API_BASE_URL as string // Safe assertion after validation
 ): Promise<T> {
     const token = getAuthToken();
+    const csrfToken = getCsrfToken();
 
     const headers = new Headers(options.headers);
 
@@ -258,22 +294,32 @@ async function apiRequest<T>(
         headers.set('Authorization', `Bearer ${token}`);
     }
 
+    // Add CSRF token for state-changing operations
+    const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method || 'GET');
+    if (isMutation && csrfToken && !headers.has('X-CSRF-Token')) {
+        headers.set('X-CSRF-Token', csrfToken);
+    }
+
     const fetchOptions: RequestInit = {
         method: options.method || 'GET',
         ...options,
         headers,
+        credentials: 'include', // Include cookies for CSRF and session
     };
 
     let response: Response;
     try {
         response = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
     } catch (error) {
-        console.log(error);
-        throw new Error("Network error. Please check your connection.", { cause: error });
+        // Don't log the full error object (may contain sensitive data)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error("Network error. Please check your connection.", {
+            cause: new Error(errorMessage)
+        });
     }
 
     // Handle 401 Unauthorized (Automatic Logout)
-    if (response.status === 401) {
+    if (response.status === HTTP_STATUS.UNAUTHORIZED) {
         if (typeof window !== 'undefined') {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('auth_user');
@@ -296,27 +342,35 @@ async function apiRequest<T>(
                 const errorData = JSON.parse(text);
                 errorMessage = errorData.message || errorData.error || errorMessage;
             } else if (text) {
-                errorMessage = text;
+                // Sanitize error text before using
+                errorMessage = text.substring(0, 200); // Limit length
             }
         } catch (e) {
-            // If parsing fails, use default or raw text
+            // If parsing fails, use default error
         }
         throw new Error(errorMessage);
     }
 
-    // Handle empty responses
-    if (!text) return {} as T;
+    // Handle empty responses - throw error instead of returning empty object
+    if (!text) {
+        // Empty response is only valid for 204 No Content
+        if (response.status === 204) {
+            return {} as T;
+        }
+        throw new Error("Empty response from server");
+    }
 
     // Handle JSON parsing safely
     try {
         return JSON.parse(text) as T;
     } catch (error) {
-        console.error("Failed to parse API response as JSON:", text);
+        // Don't log the raw text (may contain sensitive data)
         // If it's supposed to be JSON but parsing failed, throw error
         if (contentType?.includes("application/json")) {
-            throw new Error("Invalid server response format.");
+            throw new Error("Invalid JSON response from server");
         }
-        return text as unknown as T;
+        // For non-JSON content, throw error instead of unsafe cast
+        throw new Error("Unexpected response format");
     }
 }
 
@@ -703,19 +757,37 @@ export const orderApi = {
             headers: {
                 ...(token && { 'Authorization': `Bearer ${token}` }),
             },
+            credentials: 'include',
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch receipt: ${response.statusText}`);
+        }
+
         return response.text();
     },
 
-    // Download PDF (returns blob URL)
-    downloadPdf: async (orderId: number): Promise<string> => {
+    // Download PDF (returns blob and cleanup function)
+    downloadPdf: async (orderId: number): Promise<{ url: string; cleanup: () => void }> => {
         const token = getAuthToken();
         const response = await fetch(`${RESTAURANT_API_BASE_URL}/restaurants/analytics/orders/${orderId}/pdf`, {
             headers: {
                 ...(token && { 'Authorization': `Bearer ${token}` }),
             },
+            credentials: 'include',
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to download PDF: ${response.statusText}`);
+        }
+
         const blob = await response.blob();
-        return URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
+
+        // Return both URL and cleanup function to prevent memory leaks
+        return {
+            url,
+            cleanup: () => URL.revokeObjectURL(url)
+        };
     },
 };

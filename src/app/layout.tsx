@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import AdminLayout from "../components/AdminLayout";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
@@ -28,9 +29,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AuthProvider>
-          <AdminLayout>{children}</AdminLayout>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <AdminLayout>{children}</AdminLayout>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

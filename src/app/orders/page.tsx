@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
     Eye, Package, Truck, ChefHat, CheckCircle, XCircle, Clock,
     Search, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight,
@@ -51,72 +51,60 @@ export default function OrdersPage() {
 
     // Loading and messages
     const [loading, setLoading] = useState(false);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false); // Local loading for modal
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    // Fetch orders
-    const fetchOrders = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await orderApi.getAll({
-                ...filters,
-                status: filters.status === "all" ? undefined : filters.status,
-                is_qrunch: isQrunchFilter || undefined,
-                restaurant_id: restaurantId || undefined,
-                from_date: fromDate || undefined,
-                to_date: toDate || undefined,
-            });
-            setOrders(response.data?.orders || []);
-            setTotalItems(response.data?.pagination?.total || 0);
-            setTotalPages(response.data?.pagination?.total_pages || 0);
-        } catch (err) {
-            setError("Failed to fetch orders. Using sample data.");
-            // Sample data
-            setOrders([
-                {
-                    order_id: 83,
-                    customer_id: "",
-                    user_id: 0,
-                    restaurant_id: 1,
-                    order_status: "pending",
-                    payment_status: "pending",
-                    subtotal: 995,
-                    tax_amount: 179.1,
-                    total_amount: 1174.1,
-                    is_qrunch: true,
-                    qrunch_customer_name: "Hard ",
-                    table_no: 6,
-                    created_at: "2025-12-26T10:54:51.543432Z",
-                    updated_at: "2025-12-26T10:54:51.543432Z"
-                },
-                {
-                    order_id: 80,
-                    customer_id: "",
-                    user_id: 0,
-                    restaurant_id: 1,
-                    order_status: "pending",
-                    payment_status: "pending",
-                    subtotal: 398,
-                    tax_amount: 71.64,
-                    total_amount: 469.64,
-                    is_qrunch: true,
-                    qrunch_customer_name: "H",
-                    table_no: 1,
-                    created_at: "2025-12-26T09:55:15.382124Z",
-                    updated_at: "2025-12-26T09:55:15.382124Z"
-                }
-            ]);
-            setTotalItems(3);
-            setTotalPages(1);
-        } finally {
-            setLoading(false);
-        }
-    }, [filters, isQrunchFilter, restaurantId, fromDate, toDate]);
-
+    // Fetch orders with cleanup to prevent race conditions
     useEffect(() => {
+        let isMounted = true;
+        const controller = new AbortController();
+
+        const fetchOrders = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await orderApi.getAll({
+                    ...filters,
+                    status: filters.status === "all" ? undefined : filters.status,
+                    is_qrunch: isQrunchFilter || undefined,
+                    restaurant_id: restaurantId || undefined,
+                    from_date: fromDate || undefined,
+                    to_date: toDate || undefined,
+                });
+
+                // Only update state if component is still mounted
+                if (isMounted) {
+                    setOrders(response.data?.orders || []);
+                    setTotalItems(response.data?.pagination?.total || 0);
+                    setTotalPages(response.data?.pagination?.total_pages || 0);
+                }
+            } catch (err) {
+                if (isMounted) {
+                    const errorMessage = err instanceof Error
+                        ? err.message
+                        : "Failed to fetch orders. Please try again.";
+                    setError(errorMessage);
+                    // Don't use sample data - show actual error
+                    setOrders([]);
+                    setTotalItems(0);
+                    setTotalPages(0);
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
         fetchOrders();
-    }, [fetchOrders]);
+
+        // Cleanup function
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
+    }, [filters, isQrunchFilter, restaurantId, fromDate, toDate]);
 
     useEffect(() => {
         if (successMessage) {
@@ -127,18 +115,19 @@ export default function OrdersPage() {
 
     // Handlers
     const handleViewOrder = async (order: Order) => {
-        setLoading(true);
+        setIsLoadingDetails(true); // Use local loading state
         try {
             const response = await orderApi.getDetails(order.order_id);
             setSelectedOrder(response.data);
-        } catch {
-            // Use basic order data if details fail
+        } catch (err) {
+            console.error('Failed to fetch order details:', err);
+            // Fallback to basic order data
             setSelectedOrder({
                 ...order,
                 items: [],
             });
         } finally {
-            setLoading(false);
+            setIsLoadingDetails(false);
             setIsDetailModalOpen(true);
         }
     };
@@ -152,13 +141,16 @@ export default function OrdersPage() {
     const handleUpdateStatus = async () => {
         if (!statusOrderId) return;
         setLoading(true);
+        setError(null); // Clear previous errors
         try {
             await orderApi.updateStatus(statusOrderId, newStatus);
             setSuccessMessage("Order status updated successfully!");
             setIsStatusModalOpen(false);
-            fetchOrders();
+            // Trigger refetch
+            setFilters(prev => ({ ...prev }));
         } catch (err) {
-            setError("Failed to update order status");
+            const errorMessage = err instanceof Error ? err.message : "Failed to update order status";
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -166,26 +158,37 @@ export default function OrdersPage() {
 
     const handleDownloadPdf = async (orderId: number) => {
         try {
-            const url = await orderApi.downloadPdf(orderId);
+            const { url, cleanup } = await orderApi.downloadPdf(orderId);
             const a = document.createElement('a');
             a.href = url;
             a.download = `order-${orderId}.pdf`;
             a.click();
-        } catch {
-            setError("Failed to download PDF");
+            // Clean up blob URL to prevent memory leak
+            setTimeout(cleanup, 100);
+        } catch (err) {
+            console.error('Failed to download PDF:', err);
+            const errorMessage = err instanceof Error ? err.message : "Failed to download PDF";
+            setError(errorMessage);
         }
     };
 
     const handleViewReceipt = async (orderId: number) => {
         try {
             const receipt = await orderApi.getReceipt(orderId);
-            // Show receipt in a modal or new window
-            const newWindow = window.open('', '_blank');
-            if (newWindow) {
-                newWindow.document.write(`<pre style="font-family: monospace; padding: 20px;">${receipt}</pre>`);
+            // Open receipt in new window using blob approach (safer than document.write)
+            const blob = new Blob([receipt], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const newWindow = window.open(url, '_blank');
+            // Clean up after opening
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+
+            if (!newWindow) {
+                setError("Please allow popups to view receipt");
             }
-        } catch {
-            setError("Failed to get receipt");
+        } catch (err) {
+            console.error('Failed to get receipt:', err);
+            const errorMessage = err instanceof Error ? err.message : "Failed to get receipt";
+            setError(errorMessage);
         }
     };
 
@@ -249,7 +252,7 @@ export default function OrdersPage() {
                         <Filter size={16} /> Filters
                     </button>
                     <button
-                        onClick={fetchOrders}
+                        onClick={() => setFilters(prev => ({ ...prev }))}
                         className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 flex items-center gap-2"
                     >
                         <RefreshCw size={16} /> Refresh
@@ -569,7 +572,6 @@ export default function OrdersPage() {
                             </div>
                         )}
 
-                        {/* Price Breakdown */}
                         <div className="border-t pt-4 space-y-2 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Subtotal</span>
@@ -579,22 +581,22 @@ export default function OrdersPage() {
                                 <span className="text-gray-500">Tax</span>
                                 <span>{formatCurrency(selectedOrder.tax_amount)}</span>
                             </div>
-                            {(selectedOrder.delivery_fee ?? 0) > 0 && (
+                            {selectedOrder.delivery_fee && selectedOrder.delivery_fee > 0 && (
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Delivery Fee</span>
-                                    <span>{formatCurrency(selectedOrder.delivery_fee!)}</span>
+                                    <span>{formatCurrency(selectedOrder.delivery_fee)}</span>
                                 </div>
                             )}
-                            {(selectedOrder.tip_amount ?? 0) > 0 && (
+                            {selectedOrder.tip_amount && selectedOrder.tip_amount > 0 && (
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Tip</span>
-                                    <span>{formatCurrency(selectedOrder.tip_amount!)}</span>
+                                    <span>{formatCurrency(selectedOrder.tip_amount)}</span>
                                 </div>
                             )}
-                            {(selectedOrder.discount_amount ?? 0) > 0 && (
+                            {selectedOrder.discount_amount && selectedOrder.discount_amount > 0 && (
                                 <div className="flex justify-between text-green-600">
                                     <span>Discount</span>
-                                    <span>-{formatCurrency(selectedOrder.discount_amount!)}</span>
+                                    <span>-{formatCurrency(selectedOrder.discount_amount)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between font-semibold text-lg border-t pt-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Eye, Pencil, Trash2, Plus, Search, MapPin, Store,
     Loader2, AlertCircle, ChevronLeft, ChevronRight, X,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { restaurantApi, Restaurant, RestaurantFilters, UpdateRestaurantRequest, UpdateRestaurantFiles } from "@/lib/api";
+import { DATE_RANGES } from "@/lib/constants";
 
 export default function RestaurantsPage() {
     // State
@@ -55,8 +56,9 @@ export default function RestaurantsPage() {
             });
             setRestaurants(response.data?.items || []);
             setTotalItems(response.data?.meta?.total || 0);
-        } catch (err: any) {
-            setError(err.message || "Failed to fetch restaurants. Please try again later.");
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : "Failed to fetch restaurants. Please try again later.";
+            setError(errorMessage);
             setRestaurants([]); // Clear list on error instead of using mock data
         } finally {
             setLoading(false);
@@ -75,58 +77,50 @@ export default function RestaurantsPage() {
         }
     }, [successMessage]);
 
-    // Apply view filter to restaurants
-    const applyViewFilter = useCallback((restaurantList: Restaurant[]): Restaurant[] => {
+    // Get filtered restaurants with useMemo for performance
+    const filteredRestaurants = useMemo(() => {
         const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - DATE_RANGES.RECENT_DAYS);
 
         switch (viewFilter) {
             case 'recent':
-                return restaurantList.filter(r => new Date(r.created_at || '') >= sevenDaysAgo);
+                return restaurants.filter(r => new Date(r.created_at || '') >= sevenDaysAgo);
             case 'unregistered':
-                return restaurantList.filter(r => r.is_restaurant_registered === false);
+                return restaurants.filter(r => r.is_restaurant_registered === false);
             case 'no-qrunch':
-                return restaurantList.filter(r => r.is_qrunch_purchased === false);
+                return restaurants.filter(r => r.is_qrunch_purchased === false);
             case 'qrunch-requested':
-                return restaurantList.filter(r => r.is_qrunch_requested === true && r.is_qrunch_purchased === false);
+                return restaurants.filter(r => r.is_qrunch_requested === true && r.is_qrunch_purchased === false);
             default:
-                return restaurantList;
+                return restaurants;
         }
-    }, [viewFilter]);
+    }, [restaurants, viewFilter]);
 
-    // Get filtered restaurants
-    const filteredRestaurants = applyViewFilter(restaurants);
+    // Calculate statistics with single pass for performance
+    const stats = useMemo(() => {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - DATE_RANGES.RECENT_DAYS);
 
-    // Calculate statistics
-    const stats = {
-        total: restaurants.length,
-        recent: restaurants.filter(r => {
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            return new Date(r.created_at || '') >= sevenDaysAgo;
-        }).length,
-        unregistered: restaurants.filter(r => r.is_restaurant_registered === false).length,
-        noQrunch: restaurants.filter(r => r.is_qrunch_purchased === false).length,
-        qrunchRequested: restaurants.filter(r => r.is_qrunch_requested === true && r.is_qrunch_purchased === false).length,
-    };
+        return restaurants.reduce((acc, r) => {
+            acc.total++;
+            if (new Date(r.created_at || '') >= sevenDaysAgo) acc.recent++;
+            if (r.is_restaurant_registered === false) acc.unregistered++;
+            if (r.is_qrunch_purchased === false) acc.noQrunch++;
+            if (r.is_qrunch_requested === true && r.is_qrunch_purchased === false) acc.qrunchRequested++;
+            return acc;
+        }, { total: 0, recent: 0, unregistered: 0, noQrunch: 0, qrunchRequested: 0 });
+    }, [restaurants]);
 
     // Handlers
     const handleSearch = () => {
         setFilters(prev => ({ ...prev, page: 1 }));
     };
 
-    const handleViewRestaurant = async (restaurant: Restaurant) => {
+    const handleViewRestaurant = (restaurant: Restaurant) => {
+        // Don't fetch - already have the data
         setSelectedRestaurant(restaurant);
         setIsViewModalOpen(true);
-        // Optionally fetch fresh data
-        try {
-            const response = await restaurantApi.getById(restaurant.id);
-            if (response.data) {
-                setSelectedRestaurant(response.data);
-            }
-        } catch {
-            // Use existing data
-        }
+        // Note: Only refetch if user explicitly requests refresh
     };
 
     const handleEditRestaurant = (restaurant: Restaurant) => {
@@ -197,6 +191,8 @@ export default function RestaurantsPage() {
             pending: "bg-yellow-100 text-yellow-700",
             open: "bg-green-100 text-green-700", // Added for sample data consistency
         };
+        // Handle undefined/null status
+        if (!status) return styles.inactive;
         return styles[status.toLowerCase()] || styles.inactive;
     };
 
