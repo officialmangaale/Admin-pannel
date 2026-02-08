@@ -9,8 +9,18 @@ FROM node:20 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Disable telemetry during build
+
+# Build arguments for environment-specific URLs
+ARG NEXT_PUBLIC_AUTH_API_BASE_URL
+ARG NEXT_PUBLIC_RESTAURANT_API_BASE_URL
+ARG NEXT_PUBLIC_DEBUG=false
+
+# Set as environment variables for build
+ENV NEXT_PUBLIC_AUTH_API_BASE_URL=$NEXT_PUBLIC_AUTH_API_BASE_URL
+ENV NEXT_PUBLIC_RESTAURANT_API_BASE_URL=$NEXT_PUBLIC_RESTAURANT_API_BASE_URL
+ENV NEXT_PUBLIC_DEBUG=$NEXT_PUBLIC_DEBUG
 ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
 # Stage 3: Runner
