@@ -142,7 +142,7 @@ export interface Restaurant {
     longitude: number;
     status: string;
     tags?: string[];
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     is_qrunch_purchased?: boolean;
     is_qrunch_requested?: boolean;
     is_restaurant_registered?: boolean;
@@ -530,7 +530,7 @@ export const restaurantApi = {
         id: number,
         data: Partial<UpdateRestaurantRequest>,
         files?: Partial<UpdateRestaurantFiles>
-    ): Promise<{ status: string; statusCode: number; message: string; data?: any }> => {
+    ): Promise<{ status: string; statusCode: number; message: string; data?: unknown }> => {
         // If files are provided, use FormData (multipart/form-data)
         if (files && Object.keys(files).length > 0) {
             const formData = new FormData();
@@ -589,7 +589,7 @@ export const restaurantApi = {
         }
 
         // Otherwise, use JSON (application/json)
-        return apiRequest<{ status: string; statusCode: number; message: string; data?: any }>(`/restaurants/${id}`, {
+        return apiRequest<{ status: string; statusCode: number; message: string; data?: unknown }>(`/restaurants/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }, RESTAURANT_API_BASE_URL);

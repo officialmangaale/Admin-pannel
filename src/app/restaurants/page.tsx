@@ -161,8 +161,9 @@ export default function RestaurantsPage() {
             setIsEditModalOpen(false);
             setEditFiles({});
             fetchRestaurants();
-        } catch (err: any) {
-            setError(err.message || "Failed to update restaurant");
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : "Failed to update restaurant";
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

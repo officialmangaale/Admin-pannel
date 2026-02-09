@@ -10,9 +10,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Copy production environment variables for build
+COPY .env.production .env.production
+
 # Build arguments for environment-specific URLs
-ARG NEXT_PUBLIC_AUTH_API_BASE_URL
-ARG NEXT_PUBLIC_RESTAURANT_API_BASE_URL
+# Default to localhost if not provided (prevents build failure)
+ARG NEXT_PUBLIC_AUTH_API_BASE_URL=http://localhost:8000/api/v1/auth
+ARG NEXT_PUBLIC_RESTAURANT_API_BASE_URL=http://localhost:8001/api/v1
 ARG NEXT_PUBLIC_DEBUG=false
 
 # Set as environment variables for build
