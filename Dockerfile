@@ -10,19 +10,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Copy production environment variables for build
-COPY .env.production .env.production
+# Copy .env file
+COPY .env .env
 
-# Build arguments for environment-specific URLs
-# Default to localhost if not provided (prevents build failure)
-ARG NEXT_PUBLIC_AUTH_API_BASE_URL=http://localhost:8000/api/v1/auth
-ARG NEXT_PUBLIC_RESTAURANT_API_BASE_URL=http://localhost:8001/api/v1
-ARG NEXT_PUBLIC_DEBUG=false
-
-# Set as environment variables for build
-ENV NEXT_PUBLIC_AUTH_API_BASE_URL=$NEXT_PUBLIC_AUTH_API_BASE_URL
-ENV NEXT_PUBLIC_RESTAURANT_API_BASE_URL=$NEXT_PUBLIC_RESTAURANT_API_BASE_URL
-ENV NEXT_PUBLIC_DEBUG=$NEXT_PUBLIC_DEBUG
+# Set environment variables from .env file (implicitly available during build)
+# Note: Next.js will automatically read .env during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
