@@ -1,8 +1,8 @@
 // API Service Layer for Food Admin
 // Base URL for the backend API
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL || "http://13.204.68.5:8080";
-const RESTAURANT_API_BASE_URL = process.env.NEXT_PUBLIC_RESTAURANT_API_BASE_URL || "http://13.204.68.5:8082";
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL || "https://restaurant-prod.mangaale.com";
+const RESTAURANT_API_BASE_URL = process.env.NEXT_PUBLIC_RESTAURANT_API_BASE_URL || "https://restaurant-prod.mangaale.com";
 
 // Types
 export interface User {
