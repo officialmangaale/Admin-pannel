@@ -8,14 +8,15 @@ import {
 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { restaurantApi, Restaurant, RestaurantFilters, UpdateRestaurantRequest, UpdateRestaurantFiles } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export default function RestaurantsPage() {
     // State
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+    const router = useRouter();
 
     // Filters & Pagination
     const [filters, setFilters] = useState<RestaurantFilters>({
@@ -115,18 +116,8 @@ export default function RestaurantsPage() {
         setFilters(prev => ({ ...prev, page: 1 }));
     };
 
-    const handleViewRestaurant = async (restaurant: Restaurant) => {
-        setSelectedRestaurant(restaurant);
-        setIsViewModalOpen(true);
-        // Optionally fetch fresh data
-        try {
-            const response = await restaurantApi.getById(restaurant.id);
-            if (response.data) {
-                setSelectedRestaurant(response.data);
-            }
-        } catch {
-            // Use existing data
-        }
+    const handleViewRestaurant = (restaurant: Restaurant) => {
+        router.push(`/restaurants/${restaurant.id}`);
     };
 
     const handleEditRestaurant = (restaurant: Restaurant) => {
@@ -537,111 +528,6 @@ export default function RestaurantsPage() {
                     </>
                 )}
             </div>
-
-            {/* View Modal */}
-            <Modal
-                isOpen={isViewModalOpen}
-                onClose={() => setIsViewModalOpen(false)}
-                title="Restaurant Details"
-                maxWidth="2xl"
-            >
-                {selectedRestaurant && (
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            {selectedRestaurant.logo_url ? (
-                                <img
-                                    src={selectedRestaurant.logo_url}
-                                    alt={selectedRestaurant.name}
-                                    className="w-16 h-16 rounded-xl object-cover"
-                                />
-                            ) : (
-                                <div className="w-16 h-16 bg-yellow-100 rounded-xl flex items-center justify-center">
-                                    <Store className="text-yellow-600" size={28} />
-                                </div>
-                            )}
-                            <div>
-                                <h3 className="text-lg font-semibold">{selectedRestaurant.name}</h3>
-                                <p className="text-sm text-gray-500">{selectedRestaurant.category}</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <p className="text-gray-500">Owner</p>
-                                <p className="font-medium">{selectedRestaurant.owner_name}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">Type</p>
-                                <p className="font-medium">{selectedRestaurant.type}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">City</p>
-                                <p className="font-medium">{selectedRestaurant.city}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">State</p>
-                                <p className="font-medium">{selectedRestaurant.state}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">Status</p>
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedRestaurant.status)}`}>
-                                    {selectedRestaurant.status}
-                                </span>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">Qrunch</p>
-                                <p className="font-medium">{selectedRestaurant.is_qrunch_purchased ? "Purchased" : "Not Purchased"}</p>
-                            </div>
-                        </div>
-
-                        <div className="text-sm space-y-2">
-                            <p><strong>ID:</strong> {selectedRestaurant.id}</p>
-                            <p><strong>Owner Auth User ID:</strong> {selectedRestaurant.owner_auth_user_id || 'N/A'}</p>
-                            <p><strong>Address:</strong> {selectedRestaurant.street_address}, {selectedRestaurant.city}, {selectedRestaurant.state} {selectedRestaurant.postal_code}</p>
-                            <p><strong>Wallet Amount:</strong> ₹{selectedRestaurant.wallet_amount?.toFixed(2) || '0.00'}</p>
-                            <p><strong>Registration:</strong> <span className={`px-2 py-0.5 rounded-full text-xs ${selectedRestaurant.is_restaurant_registered ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{selectedRestaurant.is_restaurant_registered ? 'Registered' : 'Unregistered'}</span></p>
-                        </div>
-
-                        {selectedRestaurant.upi_vpa && (
-                            <div className="text-sm">
-                                <p className="text-gray-500">UPI VPA</p>
-                                <p className="font-medium">{selectedRestaurant.upi_vpa}</p>
-                            </div>
-                        )}
-
-                        {selectedRestaurant.tags && selectedRestaurant.tags.length > 0 && (
-                            <div className="text-sm">
-                                <p className="text-gray-500 mb-2">Tags</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedRestaurant.tags.map((tag) => (
-                                        <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex gap-2 pt-4">
-                            <button
-                                onClick={() => {
-                                    setIsViewModalOpen(false);
-                                    handleEditRestaurant(selectedRestaurant);
-                                }}
-                                className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                            >
-                                Edit Restaurant
-                            </button>
-                            <button
-                                onClick={() => setIsViewModalOpen(false)}
-                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
 
             {/* Edit Modal */}
             <Modal
