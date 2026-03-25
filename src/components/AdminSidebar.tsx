@@ -1,48 +1,65 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Home, ShoppingBag, Store, Menu as MenuIcon, Eye, Calendar, Wallet, Settings, X, User, Bike } from "lucide-react";
 
 export default function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+    const pathname = usePathname();
+    
     const items = [
-        { href: "/", label: "Dashboard", icon: <Home /> },
-        { href: "/orders", label: "Orders", icon: <ShoppingBag /> },
-        { href: "/restaurants", label: "Restaurants", icon: <Store /> },
-        { href: "/users", label: "Users", icon: <User /> },
-        { href: "/riders", label: "Riders", icon: <Bike /> },
-        { href: "/menu", label: "Menu", icon: <MenuIcon /> },
-        { href: "/history", label: "History", icon: <Eye /> },
-        { href: "/wallet", label: "Wallet", icon: <Wallet /> },
-        { href: "/calendar", label: "Calendar", icon: <Calendar /> },
-        { href: "/settings", label: "Settings", icon: <Settings /> },
+        { href: "/", label: "Dashboard", icon: <Home size={20} /> },
+        { href: "/orders", label: "Orders", icon: <ShoppingBag size={20} /> },
+        { href: "/restaurants", label: "Restaurants", icon: <Store size={20} /> },
+        { href: "/users", label: "Users", icon: <User size={20} /> },
+        { href: "/riders", label: "Riders", icon: <Bike size={20} /> },
+        { href: "/wallet", label: "Wallet", icon: <Wallet size={20} /> },
+        { href: "/history", label: "History", icon: <Eye size={20} /> },
+        { href: "/calendar", label: "Calendar", icon: <Calendar size={20} /> },
+        { href: "/settings", label: "Settings", icon: <Settings size={20} /> },
     ];
 
     return (
         <>
-            {open && <div className="fixed inset-0 bg-black/20 z-20 lg:hidden" onClick={onClose} />}
-            <aside className={`fixed left-0 top-0 h-full w-60 bg-white shadow-lg z-30 transform transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"
-                }`}>
-                <div className="flex items-center justify-between p-4 border-b">
-                    <h1 className="text-2xl font-bold text-yellow-600">Mangale</h1>
-                    <button className="lg:hidden" onClick={onClose}><X /></button>
-                </div>
-                <nav className="mt-4 space-y-1">
-                    {items.map((it) => (
-                        <Link key={it.href} href={it.href} className="flex items-center px-4 py-2 hover:bg-gray-100">
-                            <span className="text-gray-700">{it.icon}</span>
-                            <span className="ml-3 text-gray-800 font-medium">{it.label}</span>
-                        </Link>
-                    ))}
-                </nav>
-                <div className="mt-auto p-4 border-t">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">A</div>
-                            <div>
-                                <p className="text-sm font-medium">Admin User</p>
-                                <p className="text-xs text-gray-500">Super Admin</p>
-                            </div>
+            {open && <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden transition-opacity" onClick={onClose} />}
+            <aside className={`fixed left-0 top-0 h-full w-64 bg-white/95 backdrop-blur-md border-r border-slate-200/60 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"} flex flex-col`}>
+                <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100/80">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                            <Store className="text-white" size={18} />
                         </div>
-                        <button><Settings className="text-gray-600" /></button>
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">Mangaale</h1>
+                    </div>
+                    <button className="lg:hidden p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors" onClick={onClose}>
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="flex-1 py-6 px-4 overflow-y-auto space-y-1 scrollbar-hide">
+                    <p className="px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase mb-4 mt-2">Operations</p>
+                    {items.map((it, idx) => {
+                        const isActive = pathname === it.href || (it.href !== "/" && pathname?.startsWith(it.href));
+                        return (
+                            <Link key={it.href} href={it.href} className={`flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-amber-50/80 text-amber-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+                                <span className={`transition-colors duration-200 ${isActive ? 'text-amber-500' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                                    {it.icon}
+                                </span>
+                                <span className={`ml-3 text-sm tracking-wide ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                                    {it.label}
+                                </span>
+                            </Link>
+                        );
+                    })}
+                </div>
+                
+                <div className="p-4 m-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-white border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
+                            <span className="text-sm font-bold text-slate-700">A</span>
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-slate-800">Admin User</p>
+                            <p className="text-xs text-slate-500 font-medium tracking-wide">Super Admin</p>
+                        </div>
                     </div>
                 </div>
             </aside>

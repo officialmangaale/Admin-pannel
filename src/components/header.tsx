@@ -10,36 +10,49 @@ export default function Header({ onMenuClick }: HeaderProps) {
     const { user, logout } = useAuth();
 
     return (
-        <header className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center">
-                <button className="mr-4 lg:hidden text-gray-600" onClick={onMenuClick}>
-                    <Menu />
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-6 h-20 flex items-center justify-between transition-all duration-300">
+            <div className="flex items-center flex-1">
+                <button 
+                    className="mr-5 lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors" 
+                    onClick={onMenuClick}
+                >
+                    <Menu size={22} />
                 </button>
-                <div className="relative w-full max-w-md hidden md:block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <div className="relative w-full max-w-md hidden md:block group">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors" size={18} />
                     <input
                         type="text"
-                        placeholder="Search..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all outline-none"
+                        placeholder="Search operations, restaurants, or users..."
+                        className="w-full pl-11 pr-4 py-2.5 bg-slate-50/50 hover:bg-slate-100/50 border border-slate-200/60 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all outline-none text-sm font-medium text-slate-700 placeholder:text-slate-400"
                     />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <kbd className="hidden lg:inline-flex items-center justify-center px-2 py-1 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded-md shadow-sm">⌘K</kbd>
+                    </div>
                 </div>
             </div>
-            <div className="flex items-center space-x-6">
-                <button className="relative text-gray-500 hover:text-orange-500 transition-colors">
+            
+            <div className="flex items-center space-x-3 sm:space-x-6">
+                <button className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
                     <Bell size={20} />
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">3</span>
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse border-2 border-white"></span>
                 </button>
-                <div className="flex items-center space-x-4 border-l pl-6">
-                    <div className="flex flex-col items-end mr-2 text-right">
-                        <span className="text-sm font-bold text-gray-900 leading-tight">{user?.full_name || 'Admin'}</span>
-                        <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">{user?.primary_role || 'Admin'}</span>
+                
+                <div className="hidden sm:block w-px h-8 bg-slate-200/60"></div>
+                
+                <div className="flex items-center space-x-4">
+                    <div className="flex items-center gap-3 cursor-pointer group">
+                        <div className="hidden md:flex flex-col items-end text-right">
+                            <span className="text-sm font-bold text-slate-800 tracking-tight group-hover:text-amber-600 transition-colors">{user?.full_name || 'Admin'}</span>
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{user?.primary_role || 'Super Admin'}</span>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-200 text-amber-700 flex items-center justify-center shadow-sm overflow-hidden">
+                            <img src="https://ui-avatars.com/api/?name=Admin&background=fef3c7&color=b45309&bold=true" alt="Avatar" className="w-full h-full object-cover" />
+                        </div>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-                        <User size={20} />
-                    </div>
+                    
                     <button
                         onClick={logout}
-                        className="text-gray-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50"
+                        className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-xl hover:bg-red-50"
                         title="Logout"
                     >
                         <LogOut size={20} />
