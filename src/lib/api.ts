@@ -258,12 +258,6 @@ async function apiRequest<T>(
         headers.set('Authorization', `Bearer ${token}`);
     }
 
-    // Ensure all requests bypass browser cache to prevent CORS origin mismatches
-    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    headers.set('Pragma', 'no-cache');
-    headers.set('Expires', '0');
-    headers.set('ngrok-skip-browser-warning', '69420'); // bypass ngrok warning if any
-
     const fetchOptions: RequestInit = {
         method: options.method || 'GET',
         cache: 'no-store', // Disable Next.js and browser cache explicitly
