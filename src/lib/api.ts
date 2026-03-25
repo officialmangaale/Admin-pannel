@@ -1,7 +1,7 @@
 // API Service Layer for Food Admin
 // Base URL for the backend API
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL || "https://restaurant-prod.mangaale.com";
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL || "https://user-prod.mangaale.com";
 const RESTAURANT_API_BASE_URL = process.env.NEXT_PUBLIC_RESTAURANT_API_BASE_URL || "https://restaurant-prod.mangaale.com";
 
 // Types
@@ -258,8 +258,15 @@ async function apiRequest<T>(
         headers.set('Authorization', `Bearer ${token}`);
     }
 
+    // Ensure all requests bypass browser cache to prevent CORS origin mismatches
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+    headers.set('ngrok-skip-browser-warning', '69420'); // bypass ngrok warning if any
+
     const fetchOptions: RequestInit = {
         method: options.method || 'GET',
+        cache: 'no-store', // Disable Next.js and browser cache explicitly
         ...options,
         headers,
     };
@@ -453,19 +460,19 @@ export const restaurantApi = {
         if (filters.limit) params.append('limit', filters.limit.toString());
 
         const queryString = params.toString();
-        const endpoint = `/restaurants${queryString ? `?${queryString}` : ''}`;
+        const endpoint = `/admin/restaurants${queryString ? `?${queryString}` : ''}`;
 
         return apiRequest<RestaurantListResponse>(endpoint, { method: 'GET' }, RESTAURANT_API_BASE_URL);
     },
 
     // Get restaurant by ID
     getById: async (id: number): Promise<{ status: string; data: Restaurant }> => {
-        return apiRequest<{ status: string; data: Restaurant }>(`/restaurants/${id}`, { method: 'GET' }, RESTAURANT_API_BASE_URL);
+        return apiRequest<{ status: string; data: Restaurant }>(`/admin/restaurants/${id}`, { method: 'GET' }, RESTAURANT_API_BASE_URL);
     },
 
     // Update restaurant (PUT - full update)
     update: async (id: number, data: UpdateRestaurantRequest): Promise<{ status: string; message: string }> => {
-        return apiRequest<{ status: string; message: string }>(`/restaurants/${id}`, {
+        return apiRequest<{ status: string; message: string }>(`/admin/restaurants/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         }, RESTAURANT_API_BASE_URL);
@@ -488,10 +495,21 @@ export const restaurantApi = {
                 }
             });
 
+            // Map frontend file names to backend expected keys
+            const fileFieldMap: Record<string, string> = {
+                logo_url: 'logo',
+                background_url: 'background',
+                gst_certificate_url: 'gst_certificate',
+                fssai_license_url: 'fssai_license',
+                aadhaar_card_url: 'aadhaar',
+                pan_card_url: 'pan',
+            };
+
             // Add files to FormData
             Object.entries(files).forEach(([key, file]) => {
                 if (file) {
-                    formData.append(key, file);
+                    const formFieldName = fileFieldMap[key] || key;
+                    formData.append(formFieldName, file);
                 }
             });
 
@@ -502,7 +520,7 @@ export const restaurantApi = {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            const response = await fetch(`${RESTAURANT_API_BASE_URL}/restaurants/${id}`, {
+            const response = await fetch(`${RESTAURANT_API_BASE_URL}/admin/restaurants/${id}`, {
                 method: 'PATCH',
                 headers,
                 body: formData,
@@ -535,7 +553,7 @@ export const restaurantApi = {
         }
 
         // Otherwise, use JSON (application/json)
-        return apiRequest<{ status: string; statusCode: number; message: string; data?: any }>(`/restaurants/${id}`, {
+        return apiRequest<{ status: string; statusCode: number; message: string; data?: any }>(`/admin/restaurants/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
         }, RESTAURANT_API_BASE_URL);
@@ -543,7 +561,7 @@ export const restaurantApi = {
 
     // Delete restaurant
     delete: async (id: number): Promise<{ status: string; message: string }> => {
-        return apiRequest<{ status: string; message: string }>(`/restaurants/${id}`, {
+        return apiRequest<{ status: string; message: string }>(`/admin/restaurants/${id}`, {
             method: 'DELETE',
         }, RESTAURANT_API_BASE_URL);
     },
@@ -717,5 +735,34 @@ export const orderApi = {
         });
         const blob = await response.blob();
         return URL.createObjectURL(blob);
+    },
+};
+
+// Admin API
+export interface AdminDashboardData {
+    total_restaurants: number;
+    recent_restaurants: number;
+    unregistered_restaurants: number;
+    no_qrunch_restaurants: number;
+    qrunch_requested_restaurants: number;
+    total_revenue: number;
+    total_orders: number;
+    average_order_value: number;
+    average_daily_orders: number;
+    revenue_trend: { date: string; amount: number }[];
+    top_dishes: { id: number; name: string; image_url: string; price: number; growth_percentage: number }[];
+    recent_orders: { order_id: string; customer_name: string; amount: number; status: string }[];
+}
+
+export interface AdminDashboardResponse {
+    status: string;
+    statusCode: number;
+    message: string;
+    data: AdminDashboardData;
+}
+
+export const adminApi = {
+    getDashboardStats: async (): Promise<AdminDashboardResponse> => {
+        return apiRequest<AdminDashboardResponse>('/admin/dashboard', { method: 'GET' }, RESTAURANT_API_BASE_URL);
     },
 };
