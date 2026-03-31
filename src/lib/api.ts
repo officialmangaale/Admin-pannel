@@ -777,3 +777,298 @@ export const adminApi = {
         return apiRequest<AdminDashboardResponse>('/admin/dashboard', { method: 'GET' }, RESTAURANT_API_BASE_URL);
     },
 };
+
+// ─── Billing / Subscription Types ───────────────────────────────────────────
+
+export type BillingPlanType = 'PER_ORDER' | 'MONTHLY';
+export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'INACTIVE' | 'CANCELLED';
+export type LedgerEntryType = 'DEBIT' | 'CREDIT' | 'ADJUSTMENT' | 'SETTLEMENT' | 'FEE' | 'REFUND';
+
+export interface BillingPlan {
+    id: number;
+    code: string;
+    name: string;
+    type: BillingPlanType;
+    price: number;
+    duration_days: number;
+    is_default: boolean;
+    is_active: boolean;
+    description?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface BillingSummary {
+    restaurant_id: number;
+    wallet_amount: number;
+    due_amount: number;
+    current_plan?: BillingPlan | null;
+    plan_type?: BillingPlanType;
+    is_blocked: boolean;
+    block_reason?: string;
+    service_access: boolean;
+    subscription_status?: SubscriptionStatus;
+    subscription_start_at?: string;
+    subscription_end_at?: string;
+}
+
+export interface BillingSubscription {
+    id: number;
+    restaurant_id: number;
+    plan_id: number;
+    plan?: BillingPlan;
+    plan_code?: string;
+    plan_name?: string;
+    plan_type?: BillingPlanType;
+    amount?: number;
+    status: SubscriptionStatus;
+    start_at: string;
+    end_at?: string;
+    activated_by_admin_id?: number;
+    deactivated_at?: string;
+    note?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface LedgerEntry {
+    id: number;
+    restaurant_id: number;
+    type: LedgerEntryType;
+    amount: number;
+    balance_before: number;
+    balance_after: number;
+    order_id?: number | string;
+    note?: string;
+    created_by?: string;
+    created_at: string;
+}
+
+// Request types
+export interface CreateBillingPlanRequest {
+    code: string;
+    name: string;
+    type: BillingPlanType;
+    price: number;
+    duration_days: number;
+    is_default?: boolean;
+    is_active?: boolean;
+    description?: string;
+}
+
+export interface UpdateBillingPlanRequest {
+    name?: string;
+    price?: number;
+    duration_days?: number;
+    is_default?: boolean;
+    is_active?: boolean;
+    description?: string;
+}
+
+export interface ActivatePlanRequest {
+    plan_id: number;
+    note?: string;
+}
+
+export interface SwitchPlanRequest {
+    plan_id: number;
+    note?: string;
+}
+
+export interface RenewRequest {
+    note?: string;
+}
+
+export interface DeactivateRequest {
+    note?: string;
+}
+
+export interface SettlePartialRequest {
+    amount: number;
+    note?: string;
+}
+
+export interface AdjustWalletRequest {
+    amount: number;
+    reason?: string;
+    note?: string;
+}
+
+// Response wrapper types
+export interface BillingPlanListResponse {
+    status: string;
+    message?: string;
+    statusCode?: number;
+    data: {
+        plans: BillingPlan[];
+    };
+}
+
+export interface BillingPlanResponse {
+    status: string;
+    message?: string;
+    statusCode?: number;
+    data: BillingPlan;
+}
+
+export interface BillingSummaryResponse {
+    status: string;
+    message?: string;
+    data: BillingSummary;
+}
+
+export interface BillingSubscriptionResponse {
+    status: string;
+    message?: string;
+    data: BillingSubscription;
+}
+
+export interface BillingSubscriptionListResponse {
+    status: string;
+    message?: string;
+    data: {
+        subscriptions: BillingSubscription[];
+    };
+}
+
+export interface LedgerResponse {
+    status: string;
+    message?: string;
+    data: {
+        entries: LedgerEntry[];
+        pagination?: {
+            page: number;
+            limit: number;
+            total: number;
+            total_pages: number;
+        };
+    };
+}
+
+export interface BillingActionResponse {
+    status: string;
+    message: string;
+    statusCode?: number;
+    data?: any;
+}
+
+// ─── Billing API ────────────────────────────────────────────────────────────
+
+export const billingApi = {
+    // ── Plan Management ──────────────────────────────────────────────────
+
+    getPlans: async (): Promise<BillingPlanListResponse> => {
+        return apiRequest<BillingPlanListResponse>('/admin/billing/plans', {
+            method: 'GET',
+        }, RESTAURANT_API_BASE_URL);
+    },
+
+    createPlan: async (data: CreateBillingPlanRequest): Promise<BillingPlanResponse> => {
+        return apiRequest<BillingPlanResponse>('/admin/billing/plans', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }, RESTAURANT_API_BASE_URL);
+    },
+
+    updatePlan: async (planId: number, data: UpdateBillingPlanRequest): Promise<BillingPlanResponse> => {
+        return apiRequest<BillingPlanResponse>(`/admin/billing/plans/${planId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, RESTAURANT_API_BASE_URL);
+    },
+
+    // ── Restaurant Billing Queries ───────────────────────────────────────
+
+    getSummary: async (restaurantId: number): Promise<BillingSummaryResponse> => {
+        return apiRequest<BillingSummaryResponse>(
+            `/admin/billing/restaurants/${restaurantId}/summary`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    getSubscription: async (restaurantId: number): Promise<BillingSubscriptionResponse> => {
+        return apiRequest<BillingSubscriptionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/subscription`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    getLedger: async (restaurantId: number, page = 1, limit = 20): Promise<LedgerResponse> => {
+        const params = new URLSearchParams();
+        params.append('page', page.toString());
+        params.append('limit', limit.toString());
+        return apiRequest<LedgerResponse>(
+            `/admin/billing/restaurants/${restaurantId}/ledger?${params.toString()}`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    getSubscriptions: async (restaurantId: number): Promise<BillingSubscriptionListResponse> => {
+        return apiRequest<BillingSubscriptionListResponse>(
+            `/admin/billing/restaurants/${restaurantId}/subscriptions`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    // ── Restaurant Billing Actions ───────────────────────────────────────
+
+    activate: async (restaurantId: number, data: ActivatePlanRequest): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/activate`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    switchPlan: async (restaurantId: number, data: SwitchPlanRequest): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/switch`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    renew: async (restaurantId: number, data: RenewRequest = {}): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/renew`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    deactivate: async (restaurantId: number, data: DeactivateRequest = {}): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/deactivate`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    settleFull: async (restaurantId: number): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/settle/full`,
+            { method: 'POST' },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    settlePartial: async (restaurantId: number, data: SettlePartialRequest): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/settle/partial`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+
+    adjustWallet: async (restaurantId: number, data: AdjustWalletRequest): Promise<BillingActionResponse> => {
+        return apiRequest<BillingActionResponse>(
+            `/admin/billing/restaurants/${restaurantId}/wallet/adjust`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+};

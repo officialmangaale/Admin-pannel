@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Store, Menu as MenuIcon, Eye, Calendar, Wallet, Settings, X, User, Bike } from "lucide-react";
+import { Home, ShoppingBag, Store, Menu as MenuIcon, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard } from "lucide-react";
 
 export default function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pathname = usePathname();
@@ -16,6 +16,10 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/history", label: "History", icon: <Eye size={20} /> },
         { href: "/calendar", label: "Calendar", icon: <Calendar size={20} /> },
         { href: "/settings", label: "Settings", icon: <Settings size={20} /> },
+    ];
+
+    const billingItems = [
+        { href: "/billing/plans", label: "Plans", icon: <CreditCard size={20} /> },
     ];
 
     return (
@@ -36,7 +40,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
                 
                 <div className="flex-1 py-6 px-4 overflow-y-auto space-y-1 scrollbar-hide">
                     <p className="px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase mb-4 mt-2">Operations</p>
-                    {items.map((it, idx) => {
+                    {items.map((it) => {
                         const isActive = pathname === it.href || (it.href !== "/" && pathname?.startsWith(it.href));
                         return (
                             <Link key={it.href} href={it.href} className={`flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-amber-50/80 text-amber-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
@@ -49,6 +53,23 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
                             </Link>
                         );
                     })}
+
+                    <div className="pt-4 mt-4 border-t border-slate-100">
+                        <p className="px-4 text-xs font-semibold text-slate-400 tracking-wider uppercase mb-4 mt-2">Billing</p>
+                        {billingItems.map((it) => {
+                            const isActive = pathname === it.href || pathname?.startsWith(it.href);
+                            return (
+                                <Link key={it.href} href={it.href} className={`flex items-center px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-amber-50/80 text-amber-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+                                    <span className={`transition-colors duration-200 ${isActive ? 'text-amber-500' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                                        {it.icon}
+                                    </span>
+                                    <span className={`ml-3 text-sm tracking-wide ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                                        {it.label}
+                                    </span>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
                 
                 <div className="p-4 m-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">

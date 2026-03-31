@@ -8,6 +8,7 @@ import {
     Settings, Star, Tag, QrCode, Shield, Activity, Share2, Copy, FileCheck, Download
 } from "lucide-react";
 import { restaurantApi, Restaurant } from "@/lib/api";
+import BillingTab from "@/components/billing/BillingTab";
 
 const tabs = [
     { id: "overview", label: "Overview", icon: Store },
@@ -319,7 +320,11 @@ export default function RestaurantDetails() {
                         </div>
                     )}
                     
-                    {activeTab !== 'overview' && activeTab !== 'kyc' && (
+                    {activeTab === 'wallet' && restaurant && (
+                        <BillingTab restaurantId={restaurant.id} />
+                    )}
+
+                    {activeTab !== 'overview' && activeTab !== 'kyc' && activeTab !== 'wallet' && (
                         <div className="flex flex-col items-center justify-center min-h-[400px] text-center animate-in fade-in duration-500">
                             <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center mb-6 border border-amber-100 shadow-inner">
                                 <Settings size={32} className="text-amber-400" />
