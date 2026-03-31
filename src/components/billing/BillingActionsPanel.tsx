@@ -20,7 +20,7 @@ interface Props {
 const actions = [
     { key: "activate", label: "Activate Plan", icon: Play, color: "text-emerald-600", bg: "bg-emerald-50 hover:bg-emerald-100 border-emerald-200", desc: "Start a new billing plan" },
     { key: "switch", label: "Switch Plan", icon: ArrowRightLeft, color: "text-blue-600", bg: "bg-blue-50 hover:bg-blue-100 border-blue-200", desc: "Change to a different plan" },
-    { key: "renew", label: "Renew Monthly", icon: RefreshCw, color: "text-purple-600", bg: "bg-purple-50 hover:bg-purple-100 border-purple-200", desc: "Extend monthly subscription" },
+    { key: "renew", label: "Renew Subscription", icon: RefreshCw, color: "text-purple-600", bg: "bg-purple-50 hover:bg-purple-100 border-purple-200", desc: "Extend subscription" },
     { key: "settleFull", label: "Settle Full Due", icon: DollarSign, color: "text-amber-600", bg: "bg-amber-50 hover:bg-amber-100 border-amber-200", desc: "Clear entire outstanding balance" },
     { key: "settlePartial", label: "Settle Partial", icon: Wallet, color: "text-indigo-600", bg: "bg-indigo-50 hover:bg-indigo-100 border-indigo-200", desc: "Pay a portion of the due" },
     { key: "adjustWallet", label: "Adjust Wallet", icon: SlidersHorizontal, color: "text-sky-600", bg: "bg-sky-50 hover:bg-sky-100 border-sky-200", desc: "Manual wallet credit / debit" },

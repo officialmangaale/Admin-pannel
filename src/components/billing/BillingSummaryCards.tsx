@@ -32,17 +32,19 @@ export default function BillingSummaryCards({ summary, loading }: Props) {
     }
 
     const planType: BillingPlanType | undefined = summary.plan_type || summary.current_plan?.type;
-    const planName = summary.current_plan?.name || (planType === "PER_ORDER" ? "Per Order" : planType === "MONTHLY" ? "Monthly" : "No Plan");
+    const planName = summary.current_plan?.name || (planType === "PER_ORDER" ? "Per Order" : planType === "MONTHLY" ? "Monthly" : planType === "YEARLY" ? "Yearly" : "No Plan");
     const walletAmount = summary.wallet_amount ?? 0;
     const dueAmount = summary.due_amount ?? (walletAmount < 0 ? Math.abs(walletAmount) : 0);
     const isNearThreshold = planType === "PER_ORDER" && walletAmount <= -800 && walletAmount >= -1000;
 
     // Plan description
-    const planDescription = planType === "PER_ORDER"
+    const planDescription = summary.current_plan?.description || (planType === "PER_ORDER"
         ? "₹1 per paid order · All services included"
         : planType === "MONTHLY"
-            ? "₹800 / month · No per-order deduction"
-            : "No active plan";
+            ? "Monthly subscription · No per-order deduction"
+            : planType === "YEARLY"
+                ? "Yearly subscription · No per-order deduction"
+                : "No active plan");
 
     // Service status
     let statusLabel = "Active";
@@ -84,7 +86,9 @@ export default function BillingSummaryCards({ summary, loading }: Props) {
                             ? "bg-blue-100 text-blue-700 border border-blue-200"
                             : planType === "MONTHLY"
                                 ? "bg-purple-100 text-purple-700 border border-purple-200"
-                                : "bg-slate-100 text-slate-600 border border-slate-200"
+                                : planType === "YEARLY"
+                                    ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                    : "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}>
                         {planType || "NONE"}
                     </span>

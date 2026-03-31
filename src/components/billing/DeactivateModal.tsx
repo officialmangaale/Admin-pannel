@@ -60,8 +60,8 @@ export default function DeactivateModal({ isOpen, onClose, restaurantId, current
                             </div>
                             <div>
                                 <p className="text-xs text-slate-500">Wallet</p>
-                                <p className={`text-sm font-bold ${currentSummary.wallet_amount < 0 ? "text-red-600" : "text-slate-800"}`}>
-                                    ₹{currentSummary.wallet_amount.toLocaleString("en-IN")}
+                                <p className={`text-sm font-bold ${(currentSummary.wallet_amount ?? 0) < 0 ? "text-red-600" : "text-slate-800"}`}>
+                                    ₹{(currentSummary.wallet_amount ?? 0).toLocaleString("en-IN")}
                                 </p>
                             </div>
                         </div>

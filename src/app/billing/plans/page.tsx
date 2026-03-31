@@ -33,7 +33,7 @@ export default function PlansPage() {
         setError(null);
         try {
             const res = await billingApi.getPlans();
-            setPlans(res.data?.plans || []);
+            setPlans(res.data || []);
         } catch (err: any) {
             setError(err.message || "Failed to load plans");
         } finally {
@@ -60,6 +60,7 @@ export default function PlansPage() {
         active: plans.filter((p) => p.is_active).length,
         perOrder: plans.filter((p) => p.type === "PER_ORDER").length,
         monthly: plans.filter((p) => p.type === "MONTHLY").length,
+        yearly: plans.filter((p) => p.type === "YEARLY").length,
     };
 
     return (
@@ -85,12 +86,13 @@ export default function PlansPage() {
             </div>
 
             {/* Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
                 {[
                     { label: "Total Plans", value: metrics.total, icon: CreditCard, color: "text-blue-500", bg: "bg-blue-50/80" },
                     { label: "Active", value: metrics.active, icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-50/80" },
                     { label: "Per Order", value: metrics.perOrder, icon: CreditCard, color: "text-indigo-500", bg: "bg-indigo-50/80" },
                     { label: "Monthly", value: metrics.monthly, icon: CreditCard, color: "text-purple-500", bg: "bg-purple-50/80" },
+                    { label: "Yearly", value: metrics.yearly, icon: CreditCard, color: "text-amber-500", bg: "bg-amber-50/80" },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/60 flex items-center gap-4 hover:-translate-y-1 transition-transform duration-300">
                         <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center flex-shrink-0 border border-white max-sm:hidden`}>
@@ -180,15 +182,17 @@ export default function PlansPage() {
                                             <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
                                                 plan.type === "PER_ORDER"
                                                     ? "bg-blue-100 text-blue-700 border-blue-200"
-                                                    : "bg-purple-100 text-purple-700 border-purple-200"
+                                                    : plan.type === "MONTHLY"
+                                                        ? "bg-purple-100 text-purple-700 border-purple-200"
+                                                        : "bg-amber-100 text-amber-700 border-amber-200"
                                             }`}>
-                                                {plan.type === "PER_ORDER" ? "Per Order" : "Monthly"}
+                                                {plan.type === "PER_ORDER" ? "Per Order" : plan.type === "MONTHLY" ? "Monthly" : "Yearly"}
                                             </span>
                                         </td>
                                         <td className="py-4 px-6 text-sm font-bold text-slate-800 text-right whitespace-nowrap">
                                             ₹{plan.price}
                                             <span className="text-xs font-medium text-slate-400 ml-1">
-                                                {plan.type === "PER_ORDER" ? "/order" : "/mo"}
+                                                {plan.type === "PER_ORDER" ? "/order" : plan.type === "MONTHLY" ? "/mo" : "/yr"}
                                             </span>
                                         </td>
                                         <td className="py-4 px-6 text-sm font-medium text-slate-600 text-right">
@@ -286,8 +290,8 @@ function PlanFormModal({ isOpen, onClose, mode, plan, onSuccess, showToast }: Pl
                 setCode(plan.code);
                 setName(plan.name);
                 setType(plan.type);
-                setPrice(plan.price.toString());
-                setDurationDays(plan.duration_days.toString());
+                setPrice(plan.price?.toString() || "0");
+                setDurationDays(plan.duration_days?.toString() || "");
                 setDescription(plan.description || "");
                 setIsActive(plan.is_active);
                 setIsDefault(plan.is_default);
@@ -381,6 +385,7 @@ function PlanFormModal({ isOpen, onClose, mode, plan, onSuccess, showToast }: Pl
                         >
                             <option value="PER_ORDER">Per Order</option>
                             <option value="MONTHLY">Monthly</option>
+                            <option value="YEARLY">Yearly</option>
                         </select>
                     </div>
 

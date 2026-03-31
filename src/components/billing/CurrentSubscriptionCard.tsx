@@ -101,7 +101,9 @@ export default function CurrentSubscriptionCard({ subscription, loading }: Props
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                         planType === "PER_ORDER"
                             ? "bg-blue-100 text-blue-700"
-                            : "bg-purple-100 text-purple-700"
+                            : planType === "MONTHLY"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-amber-100 text-amber-700"
                     }`}>
                         {planType || "—"}
                     </span>
@@ -121,7 +123,7 @@ export default function CurrentSubscriptionCard({ subscription, loading }: Props
                         <Clock size={14} className="text-slate-400" />
                         {planType === "PER_ORDER" ? "No expiry" : formatDate(subscription.end_at)}
                     </p>
-                    {planType === "MONTHLY" && daysRemaining !== null && subscription.status === "ACTIVE" && (
+                    {planType !== "PER_ORDER" && daysRemaining !== null && subscription.status === "ACTIVE" && (
                         <p className={`text-xs font-medium mt-1 ${daysRemaining <= 7 ? "text-orange-600" : "text-slate-500"}`}>
                             {daysRemaining > 0 ? `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} remaining` : daysRemaining === 0 ? "Expires today" : "Expired"}
                         </p>
@@ -134,7 +136,7 @@ export default function CurrentSubscriptionCard({ subscription, loading }: Props
                             ? "₹1 / order"
                             : subscription.amount
                                 ? `₹${subscription.amount.toLocaleString("en-IN")}`
-                                : "₹800"
+                                : planType === "YEARLY" ? "₹3,999" : "₹800"
                         }
                     </p>
                 </div>

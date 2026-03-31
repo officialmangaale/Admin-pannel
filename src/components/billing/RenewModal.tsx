@@ -31,7 +31,7 @@ export default function RenewModal({ isOpen, onClose, restaurantId, currentSubsc
         setSubmitting(true);
         try {
             await billingApi.renew(restaurantId, { note: note.trim() || undefined });
-            showToast("Monthly subscription renewed successfully", "success");
+            showToast("Subscription renewed successfully", "success");
             onSuccess();
             onClose();
             setNote("");
@@ -43,7 +43,7 @@ export default function RenewModal({ isOpen, onClose, restaurantId, currentSubsc
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Renew Monthly Subscription" maxWidth="md">
+        <Modal isOpen={isOpen} onClose={onClose} title="Renew Subscription" maxWidth="md">
             <div className="space-y-6">
                 {/* Current subscription info */}
                 <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100 space-y-3">
@@ -56,7 +56,7 @@ export default function RenewModal({ isOpen, onClose, restaurantId, currentSubsc
                             <div>
                                 <p className="text-xs text-slate-500 font-medium">Plan</p>
                                 <p className="text-sm font-bold text-slate-800">
-                                    {currentSubscription.plan_name || currentSubscription.plan?.name || "Monthly"}
+                                    {currentSubscription.plan_name || currentSubscription.plan?.name || "Active Plan"}
                                 </p>
                             </div>
                             <div>
@@ -89,7 +89,7 @@ export default function RenewModal({ isOpen, onClose, restaurantId, currentSubsc
                 </div>
 
                 <p className="text-sm text-slate-600">
-                    This action will renew the monthly subscription for another billing period. The new period will start from the current end date.
+                    This action will renew the active subscription for another billing period. The new period will start from the current end date.
                 </p>
 
                 {/* Note */}

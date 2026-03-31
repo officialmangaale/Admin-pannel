@@ -36,7 +36,7 @@ export default function SwitchPlanModal({ isOpen, onClose, restaurantId, current
         setLoadingPlans(true);
         try {
             const res = await billingApi.getPlans();
-            const activePlans = (res.data?.plans || []).filter((p) => p.is_active);
+            const activePlans = (res.data || []).filter((p) => p.is_active);
             setPlans(activePlans);
         } catch (err: any) {
             showToast(err.message || "Failed to load plans", "error");
@@ -104,7 +104,7 @@ export default function SwitchPlanModal({ isOpen, onClose, restaurantId, current
                             {plans.map((plan) => (
                                 <option key={plan.id} value={plan.id}>
                                     {plan.name} — {plan.type} — ₹{plan.price}
-                                    {plan.type === "MONTHLY" ? ` / ${plan.duration_days} days` : " / order"}
+                                    {plan.type !== "PER_ORDER" ? ` / ${plan.duration_days} days` : " / order"}
                                 </option>
                             ))}
                         </select>
@@ -127,7 +127,7 @@ export default function SwitchPlanModal({ isOpen, onClose, restaurantId, current
                         </div>
                         <p className="text-sm text-slate-600">
                             Price: <span className="font-bold">₹{selectedPlan.price}</span>
-                            {selectedPlan.type === "MONTHLY" && <span> / {selectedPlan.duration_days} days</span>}
+                            {selectedPlan.type !== "PER_ORDER" && <span> / {selectedPlan.duration_days} days</span>}
                             {selectedPlan.type === "PER_ORDER" && <span> per paid order</span>}
                         </p>
                     </div>

@@ -97,8 +97,10 @@ export default function SubscriptionHistoryTable({ subscriptions, loading }: Pro
                                             <td className="py-3 px-5">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                                                     planType === "PER_ORDER"
-                                                        ? "bg-blue-100 text-blue-700 border border-blue-200"
-                                                        : "bg-purple-100 text-purple-700 border border-purple-200"
+                                                        ? "bg-blue-50 text-blue-700 border border-blue-100"
+                                                        : planType === "MONTHLY"
+                                                            ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                                            : "bg-amber-50 text-amber-700 border border-amber-100"
                                                 }`}>
                                                     {planType || "—"}
                                                 </span>

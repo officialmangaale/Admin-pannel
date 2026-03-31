@@ -118,7 +118,7 @@ export default function BillingLedgerTable({ entries, loading, page, totalPages,
                                                     </span>
                                                 </td>
                                                 <td className={`py-3 px-5 text-sm font-bold text-right whitespace-nowrap ${isPositive ? "text-emerald-600" : "text-red-600"}`}>
-                                                    {isPositive ? "+" : ""}₹{Math.abs(entry.amount).toLocaleString("en-IN")}
+                                                    {isPositive ? "+" : ""}₹{Math.abs(entry.amount ?? 0).toLocaleString("en-IN")}
                                                 </td>
                                                 <td className="py-3 px-5 text-xs font-medium text-slate-500 text-right whitespace-nowrap">
                                                     ₹{entry.balance_before?.toLocaleString("en-IN") ?? "—"}

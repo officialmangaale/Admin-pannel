@@ -780,7 +780,7 @@ export const adminApi = {
 
 // ─── Billing / Subscription Types ───────────────────────────────────────────
 
-export type BillingPlanType = 'PER_ORDER' | 'MONTHLY';
+export type BillingPlanType = 'PER_ORDER' | 'MONTHLY' | 'YEARLY';
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'INACTIVE' | 'CANCELLED';
 export type LedgerEntryType = 'DEBIT' | 'CREDIT' | 'ADJUSTMENT' | 'SETTLEMENT' | 'FEE' | 'REFUND';
 
@@ -899,9 +899,7 @@ export interface BillingPlanListResponse {
     status: string;
     message?: string;
     statusCode?: number;
-    data: {
-        plans: BillingPlan[];
-    };
+    data: BillingPlan[];
 }
 
 export interface BillingPlanResponse {
@@ -958,33 +956,74 @@ export const billingApi = {
     // ── Plan Management ──────────────────────────────────────────────────
 
     getPlans: async (): Promise<BillingPlanListResponse> => {
-        return apiRequest<BillingPlanListResponse>('/admin/billing/plans', {
+        const res = await apiRequest<any>('/admin/billing/plans', {
             method: 'GET',
         }, RESTAURANT_API_BASE_URL);
+        
+        if (Array.isArray(res.data)) {
+            res.data = res.data.map((p: any) => ({
+                ...p,
+                type: p.plan_type || p.type
+            }));
+        }
+        return res as BillingPlanListResponse;
     },
 
     createPlan: async (data: CreateBillingPlanRequest): Promise<BillingPlanResponse> => {
-        return apiRequest<BillingPlanResponse>('/admin/billing/plans', {
+        const res = await apiRequest<any>('/admin/billing/plans', {
             method: 'POST',
             body: JSON.stringify(data),
         }, RESTAURANT_API_BASE_URL);
+        if (res.data) res.data.type = res.data.plan_type || res.data.type;
+        return res as BillingPlanResponse;
     },
 
     updatePlan: async (planId: number, data: UpdateBillingPlanRequest): Promise<BillingPlanResponse> => {
-        return apiRequest<BillingPlanResponse>(`/admin/billing/plans/${planId}`, {
+        const res = await apiRequest<any>(`/admin/billing/plans/${planId}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         }, RESTAURANT_API_BASE_URL);
+        if (res.data) res.data.type = res.data.plan_type || res.data.type;
+        return res as BillingPlanResponse;
     },
 
     // ── Restaurant Billing Queries ───────────────────────────────────────
 
     getSummary: async (restaurantId: number): Promise<BillingSummaryResponse> => {
-        return apiRequest<BillingSummaryResponse>(
+        const res = await apiRequest<any>(
             `/admin/billing/restaurants/${restaurantId}/summary`,
             { method: 'GET' },
             RESTAURANT_API_BASE_URL
         );
+        
+        if (res.data) {
+            const raw = res.data;
+            res.data = {
+                restaurant_id: restaurantId,
+                wallet_amount: raw.wallet_balance ?? 0,
+                due_amount: raw.due_amount ?? 0,
+                current_plan: raw.current_plan_name ? {
+                    id: 0,
+                    code: raw.current_plan_code || '',
+                    name: raw.current_plan_name,
+                    type: raw.current_plan_type as BillingPlanType,
+                    price: 0,
+                    duration_days: 0,
+                    is_active: true,
+                    is_default: false,
+                    description: raw.plan_description
+                } : null,
+                plan_type: raw.current_plan_type as BillingPlanType,
+                is_blocked: raw.is_service_blocked ?? false,
+                block_reason: raw.block_reason,
+                service_access: !(raw.is_service_blocked),
+                subscription_status: raw.subscription_status,
+                subscription_start_at: raw.subscription_start_at,
+                subscription_end_at: raw.subscription_end_at,
+            };
+        }
+
+        return res as BillingSummaryResponse;
     },
 
     getSubscription: async (restaurantId: number): Promise<BillingSubscriptionResponse> => {
