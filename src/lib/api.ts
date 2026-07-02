@@ -256,18 +256,96 @@ const getAuthToken = (): string | null => {
     return null;
 };
 
+type ApiRequestInit = RequestInit & {
+    timeoutMs?: number;
+};
+
+const DEFAULT_API_TIMEOUT_MS = 15_000;
+const DEFAULT_UPLOAD_TIMEOUT_MS = 60_000;
+const DEFAULT_DOWNLOAD_TIMEOUT_MS = 30_000;
+
+const createTimeoutError = (timeoutMs: number) => {
+    const error = new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s.`);
+    error.name = "TimeoutError";
+    return error;
+};
+
+const isTimeoutError = (error: unknown): boolean => {
+    return error instanceof Error && error.name === "TimeoutError";
+};
+
+const createTimeoutSignal = (timeoutMs: number, parentSignal?: AbortSignal | null) => {
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const abortFromParent = () => {
+        controller.abort(parentSignal?.reason);
+    };
+
+    if (parentSignal?.aborted) {
+        abortFromParent();
+    } else {
+        parentSignal?.addEventListener('abort', abortFromParent, { once: true });
+    }
+
+    if (timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+            controller.abort(createTimeoutError(timeoutMs));
+        }, timeoutMs);
+    }
+
+    return {
+        signal: controller.signal,
+        cleanup: () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            parentSignal?.removeEventListener('abort', abortFromParent);
+        },
+    };
+};
+
+const fetchWithTimeout = async (
+    input: RequestInfo | URL,
+    options: ApiRequestInit = {}
+): Promise<Response> => {
+    const {
+        timeoutMs = DEFAULT_API_TIMEOUT_MS,
+        signal: parentSignal,
+        ...fetchOptions
+    } = options;
+    const timeout = createTimeoutSignal(timeoutMs, parentSignal);
+
+    try {
+        return await fetch(input, {
+            ...fetchOptions,
+            signal: timeout.signal,
+        });
+    } catch (error) {
+        if (timeout.signal.aborted) {
+            const reason = timeout.signal.reason;
+            if (isTimeoutError(reason)) {
+                throw new Error(reason.message, { cause: error });
+            }
+            throw new Error("Request was cancelled.", { cause: error });
+        }
+        throw error;
+    } finally {
+        timeout.cleanup();
+    }
+};
+
 // Helper function for API requests
 async function apiRequest<T>(
     endpoint: string,
-    options: RequestInit = {},
+    options: ApiRequestInit = {},
     baseUrl: string = AUTH_API_BASE_URL
 ): Promise<T> {
     const token = getAuthToken();
+    const { timeoutMs, ...requestOptions } = options;
 
-    const headers = new Headers(options.headers);
+    const headers = new Headers(requestOptions.headers);
 
     // Only set Content-Type if it's not already set and we have a body
-    if (!headers.has('Content-Type') && options.body) {
+    if (!headers.has('Content-Type') && requestOptions.body) {
         headers.set('Content-Type', 'application/json');
     }
 
@@ -276,17 +354,23 @@ async function apiRequest<T>(
     }
 
     const fetchOptions: RequestInit = {
-        method: options.method || 'GET',
+        method: requestOptions.method || 'GET',
         cache: 'no-store', // Disable Next.js and browser cache explicitly
-        ...options,
+        ...requestOptions,
         headers,
     };
 
     let response: Response;
     try {
-        response = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
+        response = await fetchWithTimeout(`${baseUrl}${endpoint}`, {
+            ...fetchOptions,
+            timeoutMs,
+        });
     } catch (error) {
-        console.log(error);
+        if (error instanceof Error && (isTimeoutError(error) || error.message === "Request was cancelled.")) {
+            throw error;
+        }
+        console.error(error);
         throw new Error("Network error. Please check your connection.", { cause: error });
     }
 
@@ -531,10 +615,11 @@ export const restaurantApi = {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            const response = await fetch(`${RESTAURANT_API_BASE_URL}/admin/restaurants/${id}`, {
+            const response = await fetchWithTimeout(`${RESTAURANT_API_BASE_URL}/admin/restaurants/${id}`, {
                 method: 'PATCH',
                 headers,
                 body: formData,
+                timeoutMs: DEFAULT_UPLOAD_TIMEOUT_MS,
             });
 
             if (response.status === 401) {
@@ -560,7 +645,8 @@ export const restaurantApi = {
                 throw new Error(errorMessage);
             }
 
-            return response.json();
+            const text = await response.text();
+            return (text ? JSON.parse(text) : {}) as { status: string; statusCode: number; message: string; data?: unknown };
         }
 
         // Otherwise, use JSON (application/json)
@@ -728,22 +814,30 @@ export const orderApi = {
     // Get thermal receipt
     getReceipt: async (orderId: number, width: number = 32): Promise<string> => {
         const token = getAuthToken();
-        const response = await fetch(`${RESTAURANT_API_BASE_URL}/restaurants/analytics/orders/${orderId}/receipt?width=${width}`, {
+        const response = await fetchWithTimeout(`${RESTAURANT_API_BASE_URL}/restaurants/analytics/orders/${orderId}/receipt?width=${width}`, {
             headers: {
                 ...(token && { 'Authorization': `Bearer ${token}` }),
             },
+            timeoutMs: DEFAULT_DOWNLOAD_TIMEOUT_MS,
         });
+        if (!response.ok) {
+            throw new Error(`Receipt request failed with status ${response.status}.`);
+        }
         return response.text();
     },
 
     // Download PDF (returns blob URL)
     downloadPdf: async (orderId: number): Promise<string> => {
         const token = getAuthToken();
-        const response = await fetch(`${RESTAURANT_API_BASE_URL}/restaurants/analytics/orders/${orderId}/pdf`, {
+        const response = await fetchWithTimeout(`${RESTAURANT_API_BASE_URL}/restaurants/analytics/orders/${orderId}/pdf`, {
             headers: {
                 ...(token && { 'Authorization': `Bearer ${token}` }),
             },
+            timeoutMs: DEFAULT_DOWNLOAD_TIMEOUT_MS,
         });
+        if (!response.ok) {
+            throw new Error(`PDF request failed with status ${response.status}.`);
+        }
         const blob = await response.blob();
         return URL.createObjectURL(blob);
     },

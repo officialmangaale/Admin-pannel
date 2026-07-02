@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -32,6 +32,12 @@ export function useToast(autoDismissMs = 4000) {
     const hideToast = useCallback(() => {
         if (timerRef.current) clearTimeout(timerRef.current);
         setToast((prev) => ({ ...prev, visible: false }));
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
     }, []);
 
     return { toast, showToast, hideToast };

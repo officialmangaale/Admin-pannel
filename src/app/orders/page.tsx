@@ -180,6 +180,7 @@ export default function OrdersPage() {
             a.href = url;
             a.download = `order-${orderId}.pdf`;
             a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
         } catch {
             setError("Failed to synthesize PDF export.");
         }
@@ -190,7 +191,11 @@ export default function OrdersPage() {
             const receipt = await orderApi.getReceipt(orderId);
             const newWindow = window.open('', '_blank');
             if (newWindow) {
-                newWindow.document.write(`<pre style="font-family: monospace; padding: 20px;">${receipt}</pre>`);
+                const pre = newWindow.document.createElement('pre');
+                pre.style.fontFamily = 'monospace';
+                pre.style.padding = '20px';
+                pre.textContent = receipt;
+                newWindow.document.body.appendChild(pre);
             }
         } catch {
             setError("Failed to connect to thermal print relay.");
