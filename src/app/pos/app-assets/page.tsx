@@ -20,7 +20,22 @@ const assetCards: Array<{
 }> = [
   {
     type: "SPLASH_IMAGE",
-    title: "Splash Screen Image",
+    title: "Splash Screen 1",
+    recommended: "1080x1920px",
+  },
+  {
+    type: "SPLASH_IMAGE_2",
+    title: "Splash Screen 2",
+    recommended: "1080x1920px",
+  },
+  {
+    type: "SPLASH_IMAGE_3",
+    title: "Splash Screen 3",
+    recommended: "1080x1920px",
+  },
+  {
+    type: "SPLASH_IMAGE_4",
+    title: "Splash Screen 4",
     recommended: "1080x1920px",
   },
   {
@@ -158,7 +173,7 @@ export default function PosAppAssetsPage() {
             POS App Branding
           </h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            Manage launch, entry, and home screen imagery.
+            Manage the launch sequence, entry, and home screen imagery.
           </p>
         </div>
         <button

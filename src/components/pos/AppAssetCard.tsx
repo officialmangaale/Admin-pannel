@@ -1,7 +1,10 @@
 "use client";
 
 import { ImageUp, Trash2, Loader2 } from "lucide-react";
-import type { PosAppAsset, PosAppAssetType } from "@/services/posAppAssetsService";
+import type {
+  PosAppAsset,
+  PosAppAssetType,
+} from "@/services/posAppAssetsService";
 
 interface AppAssetCardProps {
   title: string;
@@ -25,6 +28,14 @@ export default function AppAssetCard({
   onRemove,
 }: AppAssetCardProps) {
   const inputId = `asset-${assetType}`;
+  const previewClassName =
+    assetType === "HOME_BG_IMAGE"
+      ? "aspect-[16/5]"
+      : "aspect-[9/16] max-h-[420px]";
+  const imageClassName =
+    assetType === "HOME_BG_IMAGE"
+      ? "h-full w-full object-cover"
+      : "h-full w-full object-contain bg-slate-100";
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -38,12 +49,14 @@ export default function AppAssetCard({
           </p>
         </div>
 
-        <div className="aspect-[16/9] overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+        <div
+          className={`${previewClassName} overflow-hidden rounded-lg border border-slate-200 bg-slate-50`}
+        >
           {asset?.image_url ? (
             <img
               src={asset.image_url}
               alt={title}
-              className="h-full w-full object-cover"
+              className={imageClassName}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-slate-400">
@@ -56,7 +69,9 @@ export default function AppAssetCard({
           <p className="text-xs font-medium text-slate-500">
             Last updated:{" "}
             <span className="text-slate-700">
-              {asset?.updated_at ? new Date(asset.updated_at).toLocaleString() : "Not set"}
+              {asset?.updated_at
+                ? new Date(asset.updated_at).toLocaleString()
+                : "Not set"}
             </span>
           </p>
           <div className="flex gap-2">
@@ -75,7 +90,11 @@ export default function AppAssetCard({
               htmlFor={inputId}
               className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
             >
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <ImageUp size={16} />}
+              {busy ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <ImageUp size={16} />
+              )}
               Upload
             </label>
             <button

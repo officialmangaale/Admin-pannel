@@ -6,6 +6,9 @@ const RESTAURANT_API_BASE_URL =
 
 export type PosAppAssetType =
   | "SPLASH_IMAGE"
+  | "SPLASH_IMAGE_2"
+  | "SPLASH_IMAGE_3"
+  | "SPLASH_IMAGE_4"
   | "ENTRY_IMAGE"
   | "HOME_BG_IMAGE";
 
@@ -25,6 +28,7 @@ export interface PosAppAsset {
 
 export interface PosAppAssetsResponse {
   splash_image_url?: string;
+  splash_image_urls?: string[];
   entry_image_url?: string;
   home_bg_image_url?: string;
   fetched_at?: string;
