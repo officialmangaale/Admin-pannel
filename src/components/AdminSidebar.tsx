@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Store, Menu as MenuIcon, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard } from "lucide-react";
+import { Home, ShoppingBag, Store, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard, Images } from "lucide-react";
 
 export default function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pathname = usePathname();
@@ -10,6 +10,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/", label: "Dashboard", icon: <Home size={20} /> },
         { href: "/orders", label: "Orders", icon: <ShoppingBag size={20} /> },
         { href: "/restaurants", label: "Restaurants", icon: <Store size={20} /> },
+        { href: "/pos/app-assets", label: "POS Branding", icon: <Images size={20} /> },
         { href: "/users", label: "Users", icon: <User size={20} /> },
         { href: "/riders", label: "Riders", icon: <Bike size={20} /> },
         { href: "/wallet", label: "Wallet", icon: <Wallet size={20} /> },
