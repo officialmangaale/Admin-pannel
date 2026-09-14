@@ -396,7 +396,10 @@ async function apiRequest<T>(
             // Try to parse error message if it's JSON
             if (text && contentType?.includes("application/json")) {
                 const errorData = JSON.parse(text);
-                errorMessage = errorData.message || errorData.error || errorMessage;
+                // Services answer {"success":false,"error":{"code","message"}}; older
+                // endpoints use a top-level message or a plain error string.
+                const nestedMessage = errorData?.error && typeof errorData.error === "object" ? errorData.error.message : undefined;
+                errorMessage = errorData.message || nestedMessage || (typeof errorData.error === "string" ? errorData.error : undefined) || errorMessage;
             } else if (text) {
                 errorMessage = text;
             }
@@ -638,7 +641,10 @@ export const restaurantApi = {
                 let errorMessage = `HTTP error! status: ${response.status}`;
                 try {
                     const errorData = JSON.parse(text);
-                    errorMessage = errorData.message || errorData.error || errorMessage;
+                    // Services answer {"success":false,"error":{"code","message"}}; older
+                    // endpoints use a top-level message or a plain error string.
+                    const nestedMessage = errorData?.error && typeof errorData.error === "object" ? errorData.error.message : undefined;
+                    errorMessage = errorData.message || nestedMessage || (typeof errorData.error === "string" ? errorData.error : undefined) || errorMessage;
                 } catch (e) {
                     if (text) errorMessage = text;
                 }
@@ -1203,5 +1209,126 @@ export const billingApi = {
             { method: 'POST', body: JSON.stringify(data) },
             RESTAURANT_API_BASE_URL
         );
+    },
+};
+
+// ---------------------------------------------------------------------------
+// Grocery merchant approval (shopkeeper Phase 2)
+// ---------------------------------------------------------------------------
+
+export type GroceryMerchantStatus = "pending_approval" | "active" | "rejected" | "suspended";
+
+export interface GroceryMerchantDocumentCounts {
+    total: number;
+    pending: number;
+    verified: number;
+    rejected: number;
+}
+
+export interface GroceryMerchantSummary {
+    grocery_merchant_id: number;
+    name: string;
+    owner_name: string;
+    business_category: string;
+    city: string;
+    postal_code: string;
+    status: string;
+    is_open: boolean;
+    has_valid_store: boolean;
+    created_at: string;
+    approved_at?: string | null;
+    documents: GroceryMerchantDocumentCounts;
+}
+
+export interface GroceryMerchantDocument {
+    id: number;
+    document_type: string;
+    status: string;
+    file_url: string;
+    uploaded_at: string;
+    reviewed_at?: string | null;
+    rejection_reason?: string;
+}
+
+export interface GroceryMerchantDetail {
+    grocery_merchant_id: number;
+    name: string;
+    owner_name: string;
+    phone_masked: string;
+    business_category: string;
+    description: string;
+    address: string;
+    landmark: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    status: string;
+    is_open: boolean;
+    supports_delivery: boolean;
+    min_order_value: number;
+    gst_number: string;
+    fssai_number: string;
+    logo_url: string;
+    banner_url: string;
+    created_at: string;
+    approved_at: string | null;
+    rejection_reason: string;
+    location: { captured: boolean; delivery_radius_km: number };
+    can_approve: boolean;
+    documents: GroceryMerchantDocument[];
+}
+
+export interface GroceryMerchantListResult {
+    merchants: GroceryMerchantSummary[];
+    meta: { page: number; limit: number; total: number };
+}
+
+interface GroceryEnvelope<T> {
+    success: boolean;
+    message: string;
+    data: T;
+}
+
+export const groceryAdminApi = {
+    list: async (params: { status?: string; q?: string; page?: number; limit?: number } = {}): Promise<GroceryMerchantListResult> => {
+        const query = new URLSearchParams();
+        if (params.status) query.append("status", params.status);
+        if (params.q) query.append("q", params.q);
+        if (params.page) query.append("page", params.page.toString());
+        if (params.limit) query.append("limit", params.limit.toString());
+        const qs = query.toString();
+        const res = await apiRequest<GroceryEnvelope<GroceryMerchantListResult>>(
+            `/admin/grocery/merchants${qs ? `?${qs}` : ""}`,
+            { method: "GET" },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data ?? { merchants: [], meta: { page: 1, limit: params.limit ?? 20, total: 0 } };
+    },
+
+    get: async (id: number): Promise<GroceryMerchantDetail> => {
+        const res = await apiRequest<GroceryEnvelope<{ merchant: GroceryMerchantDetail }>>(
+            `/admin/grocery/merchants/${id}`,
+            { method: "GET" },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data.merchant;
+    },
+
+    approve: async (id: number): Promise<GroceryMerchantDetail> => {
+        const res = await apiRequest<GroceryEnvelope<{ merchant: GroceryMerchantDetail }>>(
+            `/admin/grocery/merchants/${id}/approve`,
+            { method: "POST" },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data.merchant;
+    },
+
+    reject: async (id: number, reason: string): Promise<GroceryMerchantDetail> => {
+        const res = await apiRequest<GroceryEnvelope<{ merchant: GroceryMerchantDetail }>>(
+            `/admin/grocery/merchants/${id}/reject`,
+            { method: "POST", body: JSON.stringify({ reason }) },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data.merchant;
     },
 };
