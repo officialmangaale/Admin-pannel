@@ -11,6 +11,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/orders", label: "Orders", icon: <ShoppingBag size={20} /> },
         { href: "/restaurants", label: "Restaurants", icon: <Store size={20} /> },
         { href: "/grocery-shops", label: "Grocery Shops", icon: <ShoppingBasket size={20} /> },
+        { href: "/grocery-categories", label: "Grocery Categories", icon: <ShoppingBasket size={20} /> },
         { href: "/pos/app-assets", label: "POS Branding", icon: <Images size={20} /> },
         { href: "/users", label: "Users", icon: <User size={20} /> },
         { href: "/riders", label: "Riders", icon: <Bike size={20} /> },
