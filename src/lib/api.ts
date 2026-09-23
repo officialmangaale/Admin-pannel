@@ -1289,6 +1289,65 @@ interface GroceryEnvelope<T> {
     data: T;
 }
 
+/** A category on the customer grocery app's category grid. */
+export interface GroceryPlatformCategory {
+    grocery_platform_category_id: number;
+    slug: string;
+    name: string;
+    image_url?: string;
+    section: string;
+    section_order: number;
+    display_order: number;
+    parent_category_id?: number | null;
+    is_active: boolean;
+}
+
+export interface GroceryPlatformCategoryInput {
+    name?: string;
+    slug?: string;
+    image_url?: string;
+    section?: string;
+    section_order?: number;
+    display_order?: number;
+    is_active?: boolean;
+}
+
+/**
+ * The platform grocery category taxonomy.
+ *
+ * Shops map their own categories onto these, so the same card means the same
+ * thing in every shop. A category with no shop stocking it simply does not
+ * appear on the customer's grid.
+ */
+export const groceryPlatformCategoryApi = {
+    list: async (): Promise<GroceryPlatformCategory[]> => {
+        const res = await apiRequest<GroceryEnvelope<{ categories: GroceryPlatformCategory[] }>>(
+            `/admin/grocery/platform-categories`,
+            { method: "GET" },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data?.categories ?? [];
+    },
+
+    create: async (input: GroceryPlatformCategoryInput): Promise<GroceryPlatformCategory> => {
+        const res = await apiRequest<GroceryEnvelope<{ category: GroceryPlatformCategory }>>(
+            `/admin/grocery/platform-categories`,
+            { method: "POST", body: JSON.stringify(input) },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data.category;
+    },
+
+    update: async (id: number, input: GroceryPlatformCategoryInput): Promise<GroceryPlatformCategory> => {
+        const res = await apiRequest<GroceryEnvelope<{ category: GroceryPlatformCategory }>>(
+            `/admin/grocery/platform-categories/${id}`,
+            { method: "PUT", body: JSON.stringify(input) },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data.category;
+    },
+};
+
 export const groceryAdminApi = {
     list: async (params: { status?: string; q?: string; page?: number; limit?: number } = {}): Promise<GroceryMerchantListResult> => {
         const query = new URLSearchParams();
