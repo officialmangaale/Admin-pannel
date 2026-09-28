@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Store, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard, Images, Gift, ShoppingBasket } from "lucide-react";
+import { Home, ShoppingBag, Store, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard, Images, Gift, ShoppingBasket, Truck, Percent, Tag, Receipt, Ticket } from "lucide-react";
 
 export default function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pathname = usePathname();
@@ -10,6 +10,11 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/", label: "Dashboard", icon: <Home size={20} /> },
         { href: "/orders", label: "Orders", icon: <ShoppingBag size={20} /> },
         { href: "/restaurants", label: "Restaurants", icon: <Store size={20} /> },
+        { href: "/delivery-pricing", label: "Delivery Pricing", icon: <Truck size={20} /> },
+        { href: "/commission-rules", label: "Commission Rules", icon: <Percent size={20} /> },
+        { href: "/markup-rules", label: "Markup Rules", icon: <Tag size={20} /> },
+        { href: "/fee-rules", label: "Fee Rules", icon: <Receipt size={20} /> },
+        { href: "/coupons", label: "Coupons", icon: <Ticket size={20} /> },
         { href: "/grocery-shops", label: "Grocery Shops", icon: <ShoppingBasket size={20} /> },
         { href: "/grocery-categories", label: "Grocery Categories", icon: <ShoppingBasket size={20} /> },
         { href: "/pos/app-assets", label: "POS Branding", icon: <Images size={20} /> },

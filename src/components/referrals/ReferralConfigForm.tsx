@@ -28,18 +28,41 @@ interface Draft {
   referred_reward_percent: string;
   referred_reward_uses: string;
   min_qualifying_order_rupees: string;
+  customer_first_delivered_only: boolean;
   restaurant_qualify_on: RestaurantQualifyOn;
   rider_min_deliveries: string;
   invite_expiry_days: string;
   reward_expiry_days: string;
   max_rewards_per_referrer: string;
   max_rewards_per_referred: string;
+  max_total_referrals: string;
+  daily_referral_limit: string;
+  monthly_referral_limit: string;
   self_referral_block_enabled: boolean;
   duplicate_contact_review_enabled: boolean;
   duplicate_device_review_enabled: boolean;
   allow_test_mode: boolean;
+  effective_from: string;
+  effective_to: string;
   admin_notes: string;
 }
+
+// The API gives a full ISO timestamp; <input type="datetime-local"> wants
+// "YYYY-MM-DDTHH:mm" in local time with no timezone suffix.
+const toLocalInput = (iso?: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const fromLocalInput = (local: string): string | undefined => {
+  if (!local) return undefined;
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString();
+};
 
 const toDraft = (c: ReferralConfig): Draft => ({
   name: c.name,
@@ -53,16 +76,22 @@ const toDraft = (c: ReferralConfig): Draft => ({
   referred_reward_percent: String(c.referred_reward_percent),
   referred_reward_uses: String(c.referred_reward_uses || 1),
   min_qualifying_order_rupees: String(millisToRupees(c.min_qualifying_order_millis)),
+  customer_first_delivered_only: c.customer_first_delivered_only,
   restaurant_qualify_on: c.restaurant_qualify_on,
   rider_min_deliveries: String(c.rider_min_deliveries),
   invite_expiry_days: String(c.invite_expiry_days),
   reward_expiry_days: String(c.reward_expiry_days),
   max_rewards_per_referrer: String(c.max_rewards_per_referrer),
   max_rewards_per_referred: String(c.max_rewards_per_referred),
+  max_total_referrals: String(c.max_total_referrals ?? 0),
+  daily_referral_limit: String(c.daily_referral_limit ?? 0),
+  monthly_referral_limit: String(c.monthly_referral_limit ?? 0),
   self_referral_block_enabled: c.self_referral_block_enabled,
   duplicate_contact_review_enabled: c.duplicate_contact_review_enabled,
   duplicate_device_review_enabled: c.duplicate_device_review_enabled,
   allow_test_mode: c.allow_test_mode,
+  effective_from: toLocalInput(c.effective_from),
+  effective_to: toLocalInput(c.effective_to),
   admin_notes: c.admin_notes,
 });
 
@@ -141,16 +170,22 @@ export default function ReferralConfigForm({
       referred_reward_percent: num(draft.referred_reward_percent),
       referred_reward_uses: num(draft.referred_reward_uses) || 1,
       min_qualifying_order_millis: rupeesToMillis(num(draft.min_qualifying_order_rupees)),
+      customer_first_delivered_only: draft.customer_first_delivered_only,
       restaurant_qualify_on: draft.restaurant_qualify_on,
       rider_min_deliveries: num(draft.rider_min_deliveries),
       invite_expiry_days: num(draft.invite_expiry_days),
       reward_expiry_days: num(draft.reward_expiry_days),
       max_rewards_per_referrer: num(draft.max_rewards_per_referrer),
       max_rewards_per_referred: num(draft.max_rewards_per_referred),
+      max_total_referrals: num(draft.max_total_referrals),
+      daily_referral_limit: num(draft.daily_referral_limit),
+      monthly_referral_limit: num(draft.monthly_referral_limit),
       self_referral_block_enabled: draft.self_referral_block_enabled,
       duplicate_contact_review_enabled: draft.duplicate_contact_review_enabled,
       duplicate_device_review_enabled: draft.duplicate_device_review_enabled,
       allow_test_mode: draft.allow_test_mode,
+      effective_from: fromLocalInput(draft.effective_from),
+      effective_to: fromLocalInput(draft.effective_to),
       admin_notes: draft.admin_notes,
     });
   };
@@ -309,19 +344,38 @@ export default function ReferralConfigForm({
 
       <Section title="Qualification">
         {config.program_type === "customer_referral" && (
-          <Field
-            label="Minimum order value (₹)"
-            hint="0 means any delivered first order qualifies."
-          >
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={draft.min_qualifying_order_rupees}
-              onChange={(e) => set("min_qualifying_order_rupees", e.target.value)}
-              className={inputClass}
-            />
-          </Field>
+          <>
+            <Field
+              label="Minimum order value (₹)"
+              hint="0 means any delivered first order qualifies."
+            >
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={draft.min_qualifying_order_rupees}
+                onChange={(e) => set("min_qualifying_order_rupees", e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <div className="mt-3">
+              <Check
+                label="Require this to genuinely be the customer's first delivered order"
+                checked={draft.customer_first_delivered_only}
+                onChange={(v) => set("customer_first_delivered_only", v)}
+              />
+            </div>
+            {draft.customer_first_delivered_only && (
+              <Warning>
+                A referral always pays out at most once regardless of this setting. This
+                specifically decides whether an order from a customer who already had prior
+                orders before applying the code can still qualify. Enforcing it fully needs the
+                order-delivered event to report the customer&apos;s total completed-order
+                count, which is not wired into the live checkout path yet — see
+                restaurant-service&apos;s referralcore/hooks.go.
+              </Warning>
+            )}
+          </>
         )}
         {config.program_type === "restaurant_referral" && (
           <Field label="Qualifies on">
@@ -388,6 +442,39 @@ export default function ReferralConfigForm({
           <Field label="Max rewards per referred" hint="0 means unlimited.">
             <input type="number" min={0} value={draft.max_rewards_per_referred}
               onChange={(e) => set("max_rewards_per_referred", e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Max total referrals" hint="Campaign-wide cap across every referrer. 0 means unlimited.">
+            <input type="number" min={0} value={draft.max_total_referrals}
+              onChange={(e) => set("max_total_referrals", e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Daily limit" hint="0 means unlimited.">
+            <input type="number" min={0} value={draft.daily_referral_limit}
+              onChange={(e) => set("daily_referral_limit", e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Monthly limit" hint="0 means unlimited.">
+            <input type="number" min={0} value={draft.monthly_referral_limit}
+              onChange={(e) => set("monthly_referral_limit", e.target.value)} className={inputClass} />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Campaign schedule" subtitle="When this rule version is allowed to apply.">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Effective from">
+            <input
+              type="datetime-local"
+              value={draft.effective_from}
+              onChange={(e) => set("effective_from", e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Effective to" hint="Leave blank for no end date.">
+            <input
+              type="datetime-local"
+              value={draft.effective_to}
+              onChange={(e) => set("effective_to", e.target.value)}
+              className={inputClass}
+            />
           </Field>
         </div>
       </Section>

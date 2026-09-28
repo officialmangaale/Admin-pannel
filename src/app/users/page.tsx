@@ -8,6 +8,31 @@ import { userApi, roleApi, permissionApi, User, Role, Permission } from "@/lib/a
 
 type TabType = "users" | "roles" | "permissions";
 
+/**
+ * Turns a failed request into something an operator can act on.
+ *
+ * This screen must never substitute placeholder records for real ones: an
+ * admin looking at a user directory has to be able to trust that every row is
+ * a real account. A permission error in particular is a real answer, not a
+ * failure to be papered over.
+ */
+function describeFetchError(err: unknown, subject: string): string {
+    const message = err instanceof Error ? err.message : "";
+
+    if (message.includes("Unauthorized") || message.includes("Session expired")) {
+        return `Your session has expired. Sign in again to view ${subject}.`;
+    }
+    if (message.toLowerCase().includes("permission denied") || message.includes("403")) {
+        return `You do not have permission to view ${subject}. Ask an administrator for the manage_users permission.`;
+    }
+    if (message.includes("timed out")) {
+        return `Loading ${subject} timed out. Check your connection and retry.`;
+    }
+    return message
+        ? `Unable to load ${subject}. ${message}`
+        : `Unable to load ${subject}. Retry, or contact support if this continues.`;
+}
+
 export default function UsersPage() {
     // Tab state
     const [activeTab, setActiveTab] = useState<TabType>("users");
@@ -72,12 +97,8 @@ export default function UsersPage() {
             const response = await userApi.getAll();
             setUsers(Array.isArray(response) ? response : []);
         } catch (err) {
-            setError("Failed to fetch internal directory. Displaying sample data.");
-            setUsers([
-                { id: "1", full_name: "Admin Executive", email: "admin@example.com", role: "Admin", primary_role: "super_admin", status: "active" },
-                { id: "2", full_name: "Sarah Operations", email: "sarah@example.com", role: "Manager", primary_role: "manager", status: "active" },
-                { id: "3", full_name: "John Analyst", email: "john@example.com", role: "Viewer", primary_role: "viewer", status: "blocked" },
-            ]);
+            setError(describeFetchError(err, "user directory"));
+            setUsers([]);
         } finally {
             setLoading(false);
         }
@@ -87,12 +108,9 @@ export default function UsersPage() {
         try {
             const response = await roleApi.getAll();
             setRoles(response.data?.roles || []);
-        } catch {
-            setRoles([
-                { id: 1, name: "super_admin", description: "Full system access including destructive actions." },
-                { id: 2, name: "manager", description: "Can manage resources and approve requests." },
-                { id: 3, name: "viewer", description: "Read-only access to basic telemetry." }
-            ]);
+        } catch (err) {
+            setError(describeFetchError(err, "roles"));
+            setRoles([]);
         }
     };
 
@@ -100,12 +118,9 @@ export default function UsersPage() {
         try {
             const response = await permissionApi.getAll();
             setPermissions(response.data?.permissions || []);
-        } catch {
-            setPermissions([
-                { id: 1, name: "manage_users", description: "Create, edit, or delete user accounts." },
-                { id: 2, name: "view_financials", description: "Access to platform revenue and history." },
-                { id: 3, name: "manage_restaurants", description: "Approve or disable restaurant entities." }
-            ]);
+        } catch (err) {
+            setError(describeFetchError(err, "permissions"));
+            setPermissions([]);
         }
     };
 
