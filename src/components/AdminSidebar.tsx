@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Store, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard, Images } from "lucide-react";
+import { Home, ShoppingBag, Store, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard, Images, Gift, ShoppingBasket } from "lucide-react";
 
 export default function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pathname = usePathname();
@@ -10,10 +10,13 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/", label: "Dashboard", icon: <Home size={20} /> },
         { href: "/orders", label: "Orders", icon: <ShoppingBag size={20} /> },
         { href: "/restaurants", label: "Restaurants", icon: <Store size={20} /> },
+        { href: "/grocery-shops", label: "Grocery Shops", icon: <ShoppingBasket size={20} /> },
+        { href: "/grocery-categories", label: "Grocery Categories", icon: <ShoppingBasket size={20} /> },
         { href: "/pos/app-assets", label: "POS Branding", icon: <Images size={20} /> },
         { href: "/users", label: "Users", icon: <User size={20} /> },
         { href: "/riders", label: "Riders", icon: <Bike size={20} /> },
         { href: "/wallet", label: "Wallet", icon: <Wallet size={20} /> },
+        { href: "/referrals", label: "Referrals", icon: <Gift size={20} /> },
         { href: "/history", label: "History", icon: <Eye size={20} /> },
         { href: "/calendar", label: "Calendar", icon: <Calendar size={20} /> },
         { href: "/settings", label: "Settings", icon: <Settings size={20} /> },
