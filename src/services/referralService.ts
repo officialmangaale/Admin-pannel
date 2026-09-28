@@ -119,6 +119,10 @@ export interface ReferralConfig {
   reward_expiry_days: number;
   max_rewards_per_referrer: number;
   max_rewards_per_referred: number;
+  /** Campaign-wide budget caps (platform upgrade Module 7). 0 = uncapped. */
+  max_total_referrals: number;
+  daily_referral_limit: number;
+  monthly_referral_limit: number;
 
   self_referral_block_enabled: boolean;
   duplicate_contact_review_enabled: boolean;
