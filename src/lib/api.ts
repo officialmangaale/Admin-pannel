@@ -850,6 +850,8 @@ export const orderApi = {
 };
 
 // Admin API
+export type DashboardPeriod = "today" | "7d" | "30d" | "all";
+
 export interface AdminDashboardData {
     total_restaurants: number;
     recent_restaurants: number;
@@ -857,12 +859,17 @@ export interface AdminDashboardData {
     no_qrunch_restaurants: number;
     qrunch_requested_restaurants: number;
     total_revenue: number;
+    net_profit: number;
+    revenue_growth_percentage: number;
     total_orders: number;
     average_order_value: number;
     average_daily_orders: number;
     revenue_trend: { date: string; amount: number }[];
     top_dishes: { id: number; name: string; image_url: string; price: number; growth_percentage: number }[];
     recent_orders: { order_id: string; customer_name: string; amount: number; status: string }[];
+    restaurant_payouts_pending: number;
+    rider_payouts_pending: number;
+    verifications_needed: number;
 }
 
 export interface AdminDashboardResponse {
@@ -873,8 +880,8 @@ export interface AdminDashboardResponse {
 }
 
 export const adminApi = {
-    getDashboardStats: async (): Promise<AdminDashboardResponse> => {
-        return apiRequest<AdminDashboardResponse>('/admin/dashboard', { method: 'GET' }, RESTAURANT_API_BASE_URL);
+    getDashboardStats: async (period: DashboardPeriod = "30d"): Promise<AdminDashboardResponse> => {
+        return apiRequest<AdminDashboardResponse>(`/admin/dashboard?period=${period}`, { method: 'GET' }, RESTAURANT_API_BASE_URL);
     },
 };
 
@@ -1209,6 +1216,119 @@ export const billingApi = {
             { method: 'POST', body: JSON.stringify(data) },
             RESTAURANT_API_BASE_URL
         );
+    },
+};
+
+// ─── Restaurant Payout Ledger (platform upgrade Module 12) ────────────────
+// What the platform owes the restaurant for completed order revenue —
+// separate from billingApi above, which tracks the opposite direction
+// (what the restaurant owes the platform for subscription fees).
+
+export interface RestaurantPayoutTransaction {
+    id: number;
+    restaurant_id: number;
+    order_id?: number | null;
+    transaction_type: string;
+    amount: number;
+    balance_before: number;
+    balance_after: number;
+    reference_number?: string | null;
+    notes?: string | null;
+    created_by_admin_id?: string | null;
+    created_at: string;
+}
+
+export interface RestaurantPayout {
+    id: number;
+    restaurant_id: number;
+    previous_balance: number;
+    payout_amount: number;
+    adjustment_amount: number;
+    closing_balance: number;
+    payment_mode?: string | null;
+    reference_number?: string | null;
+    is_full_and_final: boolean;
+    notes?: string | null;
+    admin_id: string;
+    wallet_transaction_id?: number | null;
+    created_at: string;
+}
+
+interface PayoutListMeta {
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface CreatePayoutRequest {
+    payout_amount: number;
+    adjustment_amount: number;
+    payment_mode?: string;
+    reference_number?: string;
+    is_full_and_final: boolean;
+    notes?: string;
+}
+
+export const restaurantPayoutApi = {
+    getBalance: async (restaurantId: number): Promise<{ status: string; data: { balance: number } }> => {
+        return apiRequest(`/admin/restaurants/${restaurantId}/payout/balance`, { method: 'GET' }, RESTAURANT_API_BASE_URL);
+    },
+
+    getTransactions: async (restaurantId: number, page = 1, limit = 20) => {
+        const res = await apiRequest<{ status: string; data: { items: RestaurantPayoutTransaction[]; meta: PayoutListMeta } }>(
+            `/admin/restaurants/${restaurantId}/payout/transactions?page=${page}&limit=${limit}`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data;
+    },
+
+    getPayouts: async (restaurantId: number, page = 1, limit = 20) => {
+        const res = await apiRequest<{ status: string; data: { items: RestaurantPayout[]; meta: PayoutListMeta } }>(
+            `/admin/restaurants/${restaurantId}/payouts?page=${page}&limit=${limit}`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data;
+    },
+
+    createPayout: async (restaurantId: number, data: CreatePayoutRequest) => {
+        return apiRequest<{ status: string; message: string; data: RestaurantPayout }>(
+            `/admin/restaurants/${restaurantId}/payouts`,
+            { method: 'POST', body: JSON.stringify(data) },
+            RESTAURANT_API_BASE_URL
+        );
+    },
+};
+
+// ─── Restaurant Credit Limit (platform upgrade Module 12) ─────────────────
+// Admin-configurable version of the wallet-floor auto-suspend check —
+// global default (restaurant_id null) plus optional per-restaurant override.
+
+export interface CreditLimitRule {
+    id: number;
+    restaurant_id: number | null;
+    wallet_floor_amount: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    created_by?: string | null;
+}
+
+export const creditLimitApi = {
+    list: async (): Promise<{ status: string; data: CreditLimitRule[] }> => {
+        return apiRequest(`/admin/credit-limits`, { method: 'GET' }, RESTAURANT_API_BASE_URL);
+    },
+
+    upsert: async (restaurantId: number | null, walletFloorAmount: number): Promise<{ status: string; data: CreditLimitRule }> => {
+        return apiRequest(`/admin/credit-limits`, {
+            method: 'PUT',
+            body: JSON.stringify({ restaurant_id: restaurantId, wallet_floor_amount: walletFloorAmount }),
+        }, RESTAURANT_API_BASE_URL);
+    },
+
+    deleteOverride: async (restaurantId: number): Promise<{ status: string; message: string }> => {
+        return apiRequest(`/admin/restaurants/${restaurantId}/credit-limit`, { method: 'DELETE' }, RESTAURANT_API_BASE_URL);
     },
 };
 

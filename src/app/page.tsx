@@ -7,19 +7,19 @@ import {
   Clock, CheckCircle, XCircle 
 } from "lucide-react";
 import RevenueChart from "../components/RevenueChart";
-import { adminApi, AdminDashboardData } from "@/lib/api";
+import { adminApi, AdminDashboardData, DashboardPeriod } from "@/lib/api";
 
 export default function Dashboard() {
   const [data, setData] = useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState("30d");
+  const [dateRange, setDateRange] = useState<DashboardPeriod>("30d");
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (period: DashboardPeriod) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await adminApi.getDashboardStats();
+      const response = await adminApi.getDashboardStats(period);
       if (response?.data) {
         setData(response.data);
       } else {
@@ -33,8 +33,8 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchDashboard();
-  }, []);
+    fetchDashboard(dateRange);
+  }, [dateRange]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -64,7 +64,7 @@ export default function Dashboard() {
         <h3 className="text-xl font-bold text-red-900 mb-2">System Error</h3>
         <p className="text-red-600 mb-8 max-w-md">{error}</p>
         <button
-          onClick={fetchDashboard}
+          onClick={() => fetchDashboard(dateRange)}
           className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center gap-2 font-semibold shadow-md shadow-red-500/20 transition-all hover:-translate-y-0.5"
         >
           <RefreshCw size={18} /> Retry Connection
@@ -85,7 +85,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex bg-white rounded-xl p-1 shadow-sm border border-slate-200/60">
-            {['today', '7d', '30d', 'all'].map((range) => (
+            {(['today', '7d', '30d', 'all'] as DashboardPeriod[]).map((range) => (
               <button
                 key={range}
                 onClick={() => setDateRange(range)}
@@ -100,7 +100,7 @@ export default function Dashboard() {
             ))}
           </div>
           <button
-            onClick={fetchDashboard}
+            onClick={() => fetchDashboard(dateRange)}
             className="p-2.5 bg-white text-slate-600 border border-slate-200/60 rounded-xl hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition-all shadow-sm flex items-center justify-center"
             title="Refresh Data"
           >
@@ -118,13 +118,26 @@ export default function Dashboard() {
             <div className="p-2.5 bg-white/10 rounded-xl border border-white/10 backdrop-blur-md">
               <IndianRupee size={22} className="text-amber-400" />
             </div>
-            <span className="flex items-center gap-1 text-xs font-bold bg-green-500/20 text-green-400 px-2.5 py-1 rounded-full border border-green-500/20">
-              <TrendingUp size={12} /> +12.5%
-            </span>
+            {dateRange !== "all" && (
+              <span
+                className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${
+                  data.revenue_growth_percentage >= 0
+                    ? "bg-green-500/20 text-green-400 border-green-500/20"
+                    : "bg-red-500/20 text-red-400 border-red-500/20"
+                }`}
+              >
+                {data.revenue_growth_percentage >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {data.revenue_growth_percentage >= 0 ? "+" : ""}
+                {data.revenue_growth_percentage.toFixed(1)}%
+              </span>
+            )}
           </div>
           <div className="relative z-10 block">
             <p className="text-slate-400 text-sm font-medium tracking-wide mb-1">Platform Revenue</p>
             <h3 className="text-4xl font-black tracking-tight">{formatCurrency(data.total_revenue)}</h3>
+            <p className="text-slate-400 text-xs font-medium mt-1.5">
+              Net profit: <span className="text-slate-200 font-semibold">{formatCurrency(data.net_profit)}</span>
+            </p>
           </div>
         </div>
 
@@ -204,8 +217,7 @@ export default function Dashboard() {
             
             <div className="h-[320px] w-full flex items-center justify-center bg-slate-50/50 rounded-2xl border border-slate-100/80">
               {data.revenue_trend && data.revenue_trend.length > 0 ? (
-                // In a real app we'd pass data.revenue_trend to <RevenueChart />
-                <RevenueChart />
+                <RevenueChart data={data.revenue_trend.map((rt) => ({ date: rt.date, amount: rt.amount }))} />
               ) : (
                 <div className="flex flex-col items-center justify-center text-slate-400">
                   <Activity size={32} className="mb-3 opacity-50" />
@@ -317,16 +329,36 @@ export default function Dashboard() {
           <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl shadow-lg border border-orange-400 p-6 sm:p-8 text-white relative overflow-hidden">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
             <h3 className="text-lg font-bold mb-2 relative z-10">Operational Insights</h3>
-            <p className="text-orange-100 text-sm font-medium mb-6 relative z-10">2 Action items require attention</p>
-            
+            <p className="text-orange-100 text-sm font-medium mb-6 relative z-10">
+              {[
+                data.restaurant_payouts_pending > 0,
+                data.rider_payouts_pending > 0,
+                data.verifications_needed > 0,
+              ].filter(Boolean).length}{" "}
+              action item{data.restaurant_payouts_pending + data.rider_payouts_pending + data.verifications_needed === 1 ? "" : "s"} require attention
+            </p>
+
             <div className="space-y-3 relative z-10">
               <div className="bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20 transition-colors cursor-pointer flex items-start gap-3">
                 <div className="mt-0.5">
                   <AlertCircle size={18} className="text-orange-200" />
                 </div>
                 <div>
-                  <p className="font-semibold text-sm">Payouts Pending</p>
-                  <p className="text-xs text-orange-100 mt-1">12 restaurants await settlement</p>
+                  <p className="font-semibold text-sm">Restaurant Payouts Pending</p>
+                  <p className="text-xs text-orange-100 mt-1">
+                    {data.restaurant_payouts_pending} restaurant{data.restaurant_payouts_pending === 1 ? "" : "s"} await settlement
+                  </p>
+                </div>
+              </div>
+              <div className="bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20 transition-colors cursor-pointer flex items-start gap-3">
+                <div className="mt-0.5">
+                  <AlertCircle size={18} className="text-orange-200" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Rider Payouts Pending</p>
+                  <p className="text-xs text-orange-100 mt-1">
+                    {data.rider_payouts_pending} rider{data.rider_payouts_pending === 1 ? "" : "s"} await settlement
+                  </p>
                 </div>
               </div>
               <div className="bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20 transition-colors cursor-pointer flex items-start gap-3">
@@ -335,7 +367,9 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="font-semibold text-sm">Verification Needed</p>
-                  <p className="text-xs text-orange-100 mt-1">5 new drivers uploaded KYC</p>
+                  <p className="text-xs text-orange-100 mt-1">
+                    {data.verifications_needed} rider{data.verifications_needed === 1 ? "" : "s"} awaiting KYC verification
+                  </p>
                 </div>
               </div>
             </div>

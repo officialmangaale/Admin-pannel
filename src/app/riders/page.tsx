@@ -1,364 +1,648 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
-import { 
-    Lock, Unlock, Eye, Search, Filter, RefreshCw, 
-    Star, MapPin, Activity, ShieldAlert, Phone, Mail, Navigation, Bike, Package
-} from "lucide-react";
-import Modal from "@/components/Modal";
-import classNames from "classnames";
+import { useCallback, useEffect, useState } from "react";
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import {
+    AdminRiderSummary,
+    RiderSettlement,
+    RiderWalletTransaction,
+    WalletAdjustmentType,
+    listRiders,
+    getRiderWalletTransactions,
+    getRiderSettlements,
+    createRiderSettlement,
+    createWalletAdjustment,
+} from "@/services/riderApi";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
 
-// Interfaces
-interface Rider {
-    id: number;
-    name: string;
-    contact: string;
-    email: string;
-    status: "active" | "blocked" | "offline";
-    joinedAt: string;
-    totalDeliveries: number;
-    rating: number;
-    zone: string;
-    walletBalance: number;
-    vehicleType: string;
+const money = (v: number) => `₹${v.toFixed(2)}`;
+const dateStr = (v?: string | null) => (v ? new Date(v).toLocaleString() : "—");
+
+/**
+ * Rider Management (platform upgrade Module 10) backed by the Module 11
+ * wallet/settlement ledger. Replaces a previous version of this page that
+ * only rendered hardcoded sample riders with no backing API.
+ *
+ * Known gaps, shown rather than hidden: no geo/zone model exists, so there
+ * is no "operational area" column — only current lat/lng when explicitly
+ * requested (include_location), gated by nothing finer than "is admin" since
+ * rider-service has no permission tiers yet. There is no block/suspend
+ * action — rider-service exposes no such endpoint today.
+ */
+export default function RiderManagementPage() {
+    const [search, setSearch] = useState("");
+    const [onlineOnly, setOnlineOnly] = useState(false);
+    const [negativeWalletOnly, setNegativeWalletOnly] = useState(false);
+    const [page, setPage] = useState(1);
+
+    const [riders, setRiders] = useState<AdminRiderSummary[]>([]);
+    const [totalPages, setTotalPages] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState<string | null>(null);
+
+    const { toast, showToast, hideToast } = useToast();
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await listRiders({
+                search: search.trim() || undefined,
+                onlineOnly,
+                negativeWalletOnly,
+                page,
+                limit: 20,
+            });
+            setRiders(res.items);
+            setTotalPages(res.pagination.total_pages || 1);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not load riders");
+        } finally {
+            setLoading(false);
+        }
+    }, [search, onlineOnly, negativeWalletOnly, page]);
+
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    return (
+        <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold">Rider Management</h1>
+                    <p className="text-sm text-gray-500">
+                        Wallet balance, COD pending, and settlement status come from the rider
+                        wallet ledger. No geo/zone model exists yet, so there is no operational
+                        area column.
+                    </p>
+                </div>
+                <button
+                    onClick={() => void load()}
+                    className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                >
+                    <RefreshCw className="h-4 w-4" /> Refresh
+                </button>
+            </div>
+
+            <div className="rounded-lg border p-4 grid gap-3 md:grid-cols-4">
+                <input
+                    className="rounded-md border px-3 py-2 text-sm"
+                    placeholder="Search name or phone"
+                    value={search}
+                    onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1);
+                    }}
+                />
+                <label className="flex items-center gap-2 text-sm px-3 py-2">
+                    <input
+                        type="checkbox"
+                        checked={onlineOnly}
+                        onChange={(e) => {
+                            setOnlineOnly(e.target.checked);
+                            setPage(1);
+                        }}
+                    />
+                    Online only
+                </label>
+                <label className="flex items-center gap-2 text-sm px-3 py-2">
+                    <input
+                        type="checkbox"
+                        checked={negativeWalletOnly}
+                        onChange={(e) => {
+                            setNegativeWalletOnly(e.target.checked);
+                            setPage(1);
+                        }}
+                    />
+                    Negative wallet only
+                </label>
+            </div>
+
+            {error && (
+                <div className="flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
+                    <AlertCircle className="h-4 w-4" /> {error}
+                </div>
+            )}
+
+            {loading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                </div>
+            ) : riders.length === 0 ? (
+                <p className="text-sm text-gray-500">No riders match this filter.</p>
+            ) : (
+                <div className="overflow-hidden rounded-lg border">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-left">
+                            <tr>
+                                <th className="px-3 py-2" />
+                                <th className="px-3 py-2">Rider</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Orders</th>
+                                <th className="px-3 py-2">Earnings</th>
+                                <th className="px-3 py-2">Wallet balance</th>
+                                <th className="px-3 py-2">Last settlement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {riders.map((r) => (
+                                <RiderRow
+                                    key={r.rider_id}
+                                    rider={r}
+                                    expanded={expanded === r.rider_id}
+                                    onToggle={() => setExpanded(expanded === r.rider_id ? null : r.rider_id)}
+                                    onSettled={() => {
+                                        showToast("Settlement recorded", "success");
+                                        void load();
+                                    }}
+                                    onError={(msg) => showToast(msg, "error")}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            <div className="flex items-center justify-between">
+                <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+                >
+                    Previous
+                </button>
+                <span className="text-sm text-gray-500">
+                    Page {page} of {totalPages}
+                </span>
+                <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+                >
+                    Next
+                </button>
+            </div>
+
+            <Toast toast={toast} onClose={hideToast} />
+        </div>
+    );
 }
 
-// Sample Data (since no riderApi is currently imported in the original)
-const dummyRiders: Rider[] = [
-    {
-        id: 1042,
-        name: "Rohan Yadav",
-        contact: "+91 98765 43210",
-        email: "rohan.y@fleet.local",
-        status: "active",
-        joinedAt: "2023-05-01",
-        totalDeliveries: 1242,
-        rating: 4.8,
-        zone: "South Mumbai",
-        walletBalance: 2450.50,
-        vehicleType: "Motorcycle"
-    },
-    {
-        id: 1089,
-        name: "Kavita Rana",
-        contact: "+91 91234 56789",
-        email: "kavita.r@fleet.local",
-        status: "blocked",
-        joinedAt: "2022-11-20",
-        totalDeliveries: 204,
-        rating: 3.2,
-        zone: "Bandra West",
-        walletBalance: 120.00,
-        vehicleType: "Scooter"
-    },
-    {
-        id: 1105,
-        name: "Imran Ali",
-        contact: "+91 99887 76655",
-        email: "imran.a@fleet.local",
-        status: "offline",
-        joinedAt: "2023-01-10",
-        totalDeliveries: 898,
-        rating: 4.9,
-        zone: "Andheri East",
-        walletBalance: 890.00,
-        vehicleType: "Motorcycle"
-    },
-];
+function RiderRow({
+    rider,
+    expanded,
+    onToggle,
+    onSettled,
+    onError,
+}: {
+    rider: AdminRiderSummary;
+    expanded: boolean;
+    onToggle: () => void;
+    onSettled: () => void;
+    onError: (message: string) => void;
+}) {
+    const balanceColor = rider.is_negative_wallet ? "text-red-600" : "text-emerald-600";
 
-export default function RiderManagementPage() {
-    const [riders, setRiders] = useState<Rider[]>(dummyRiders);
-    const [selectedRider, setSelectedRider] = useState<Rider | null>(null);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("all");
-    const [isLoading, setIsLoading] = useState(false);
+    return (
+        <>
+            <tr className="border-t cursor-pointer hover:bg-gray-50" onClick={onToggle}>
+                <td className="px-3 py-2">
+                    {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </td>
+                <td className="px-3 py-2">
+                    <div className="font-medium">{rider.name || "(no name)"}</div>
+                    <div className="text-xs text-gray-500">{rider.phone || "—"}</div>
+                </td>
+                <td className="px-3 py-2">
+                    <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            rider.is_online ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"
+                        }`}
+                    >
+                        {rider.is_online ? (rider.is_available ? "Online" : "On delivery") : "Offline"}
+                    </span>
+                </td>
+                <td className="px-3 py-2">
+                    {rider.completed_orders}{" "}
+                    <span className="text-xs text-gray-500">
+                        done, {rider.cancelled_deliveries} cancelled
+                    </span>
+                </td>
+                <td className="px-3 py-2">{money(rider.total_earnings)}</td>
+                <td className={`px-3 py-2 font-medium ${balanceColor}`}>
+                    {money(rider.wallet_balance)}
+                    {rider.is_negative_wallet && (
+                        <span className="ml-2 text-xs font-normal text-red-500">rider owes platform</span>
+                    )}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                    {rider.last_settlement_status === "never_settled"
+                        ? "Never settled"
+                        : `${rider.last_settlement_status} · ${dateStr(rider.last_settlement_at)}`}
+                </td>
+            </tr>
+            {expanded && (
+                <tr className="border-t bg-gray-50">
+                    <td colSpan={7} className="px-6 py-4">
+                        <RiderDetail rider={rider} onSettled={onSettled} onError={onError} />
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+}
 
-    // Simulated fetch
-    const fetchRiders = () => {
-        setIsLoading(true);
-        setTimeout(() => {
-            setRiders([...dummyRiders]);
-            setIsLoading(false);
-        }, 600);
-    };
+function Stat({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <div className="text-xs text-gray-500">{label}</div>
+            <div className="font-medium">{value}</div>
+        </div>
+    );
+}
 
-    const toggleStatus = (id: number) => {
-        setRiders((prev) =>
-            prev.map((rider) =>
-                rider.id === id
-                    ? {
-                        ...rider,
-                        status: rider.status === "active" ? "blocked" : "active",
-                    }
-                    : rider
-            )
-        );
-    };
+function RiderDetail({
+    rider,
+    onSettled,
+    onError,
+}: {
+    rider: AdminRiderSummary;
+    onSettled: () => void;
+    onError: (message: string) => void;
+}) {
+    const [transactions, setTransactions] = useState<RiderWalletTransaction[]>([]);
+    const [settlements, setSettlements] = useState<RiderSettlement[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showForm, setShowForm] = useState(false);
 
-    const filteredRiders = riders.filter((rider) => {
-        const matchesSearch = rider.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              rider.contact.includes(searchQuery) ||
-                              rider.id.toString().includes(searchQuery);
-        const matchesStatus = statusFilter === "all" || rider.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const [amountReceived, setAmountReceived] = useState("0");
+    const [amountPaid, setAmountPaid] = useState("0");
+    const [adjustment, setAdjustment] = useState("0");
+    const [paymentMode, setPaymentMode] = useState("");
+    const [referenceNumber, setReferenceNumber] = useState("");
+    const [isFullAndFinal, setIsFullAndFinal] = useState(false);
+    const [notes, setNotes] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-        }).format(amount);
-    };
+    const [showAdjustmentForm, setShowAdjustmentForm] = useState(false);
+    const [adjustmentType, setAdjustmentType] = useState<WalletAdjustmentType>("incentive");
+    const [adjustmentAmount, setAdjustmentAmount] = useState("");
+    const [adjustmentReference, setAdjustmentReference] = useState("");
+    const [adjustmentNotes, setAdjustmentNotes] = useState("");
+    const [adjustmentSubmitting, setAdjustmentSubmitting] = useState(false);
 
-    const getStatusStyle = (status: string) => {
-        switch (status) {
-            case "active": return "bg-emerald-50 text-emerald-700 border-emerald-200";
-            case "blocked": return "bg-red-50 text-red-700 border-red-200";
-            case "offline": return "bg-slate-100 text-slate-700 border-slate-200";
-            default: return "bg-slate-100 text-slate-700 border-slate-200";
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [txnPage, settlementPage] = await Promise.all([
+                getRiderWalletTransactions(rider.rider_id, 1, 10),
+                getRiderSettlements(rider.rider_id, 1, 5),
+            ]);
+            setTransactions(txnPage.items);
+            setSettlements(settlementPage.items);
+        } catch (err) {
+            onError(err instanceof Error ? err.message : "Could not load rider ledger");
+        } finally {
+            setLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rider.rider_id]);
+
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    const submitSettlement = async () => {
+        const received = Number(amountReceived) || 0;
+        const paid = Number(amountPaid) || 0;
+        const adj = Number(adjustment) || 0;
+        if (received === 0 && paid === 0 && adj === 0) {
+            onError("Settlement must have a non-zero received, paid, or adjustment amount");
+            return;
+        }
+        if (received < 0 || paid < 0) {
+            onError("Amount received and amount paid must not be negative");
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await createRiderSettlement(rider.rider_id, {
+                amount_received: received,
+                amount_paid: paid,
+                adjustment_amount: adj,
+                payment_mode: paymentMode || undefined,
+                reference_number: referenceNumber || undefined,
+                is_full_and_final: isFullAndFinal,
+                notes: notes || undefined,
+            });
+            setShowForm(false);
+            setAmountReceived("0");
+            setAmountPaid("0");
+            setAdjustment("0");
+            setPaymentMode("");
+            setReferenceNumber("");
+            setIsFullAndFinal(false);
+            setNotes("");
+            onSettled();
+            void load();
+        } catch (err) {
+            onError(err instanceof Error ? err.message : "Could not record settlement");
+        } finally {
+            setSubmitting(false);
         }
     };
 
+    const submitAdjustment = async () => {
+        const amt = Number(adjustmentAmount);
+        if (!amt) {
+            onError("Amount must not be zero");
+            return;
+        }
+        if (adjustmentType !== "manual_adjustment" && adjustmentType !== "refund_reversal" && amt < 0) {
+            onError("Enter a positive magnitude — direction is applied automatically for this type");
+            return;
+        }
+        setAdjustmentSubmitting(true);
+        try {
+            await createWalletAdjustment(rider.rider_id, {
+                transaction_type: adjustmentType,
+                amount: amt,
+                reference_number: adjustmentReference || undefined,
+                notes: adjustmentNotes || undefined,
+            });
+            setShowAdjustmentForm(false);
+            setAdjustmentAmount("");
+            setAdjustmentReference("");
+            setAdjustmentNotes("");
+            onSettled();
+            void load();
+        } catch (err) {
+            onError(err instanceof Error ? err.message : "Could not record wallet adjustment");
+        } finally {
+            setAdjustmentSubmitting(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading rider detail…
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-8 pb-10">
-            {/* Header Area */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">Fleet Management</h1>
-                    <p className="text-sm font-medium text-slate-500 mt-1">Monitor, dispatch, and evaluate courier network performance.</p>
-                </div>
-                
-                <div className="flex gap-3">
-                    <button
-                        onClick={fetchRiders}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors shadow-sm font-semibold text-sm"
-                    >
-                        <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} /> Sync Telemetry
-                    </button>
-                </div>
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <Stat label="Rider ID" value={rider.rider_id} />
+                <Stat label="Total incentives" value={money(rider.total_incentives)} />
+                <Stat label="Total penalties" value={money(rider.total_penalties)} />
+                <Stat label="COD pending" value={money(rider.cod_pending)} />
+                <Stat label="Platform receivable" value={money(rider.platform_receivable)} />
+                <Stat label="Rider payable" value={money(rider.rider_payable)} />
+                <Stat
+                    label="Location"
+                    value={
+                        rider.current_latitude != null && rider.current_longitude != null
+                            ? `${rider.current_latitude.toFixed(4)}, ${rider.current_longitude.toFixed(4)}`
+                            : "not requested"
+                    }
+                />
+                <Stat label="Current order" value={rider.current_order_id ? `#${rider.current_order_id}` : "none"} />
             </div>
 
-             {/* Search and Filters */}
-             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60 flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search fleet by name, ID, or phone..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200/80 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:bg-white transition-all outline-none text-sm font-semibold text-slate-800"
-                    />
-                </div>
-                <div className="flex gap-3">
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-3 bg-slate-50/50 border border-slate-200/80 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-sm font-semibold text-slate-700 min-w-[160px]"
-                    >
-                        <option value="all">All States</option>
-                        <option value="active">Active Track</option>
-                        <option value="offline">Offline</option>
-                        <option value="blocked">Blocked</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* Data Table */}
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200/60 overflow-hidden">
-                <div className="overflow-x-auto min-h-[400px]">
-                    {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-24">
-                            <RefreshCw className="w-10 h-10 animate-spin text-amber-500 mb-4" />
-                            <p className="text-slate-500 font-medium">Establishing secure connection to fleet nodes...</p>
-                        </div>
-                    ) : filteredRiders.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-24 text-center px-4 bg-slate-50/30">
-                            <Image src="/empty_search.png" alt="No riders found" width={160} height={160} className="mb-6 opacity-90 drop-shadow-md mix-blend-multiply rounded-3xl" />
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">No nodes located</h3>
-                            <p className="text-sm font-medium text-slate-500 max-w-sm border-b border-transparent">Adjust search parameters to locate couriers within the network.</p>
-                        </div>
-                    ) : (
-                        <table className="min-w-full text-left">
-                            <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-100">
-                                    <th className="py-5 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Courier Identity</th>
-                                    <th className="py-5 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Operational Area</th>
-                                    <th className="py-5 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Performance</th>
-                                    <th className="py-5 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                                    <th className="py-5 px-6 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Overrides</th>
+            <div>
+                <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Recent wallet transactions</h4>
+                {transactions.length === 0 ? (
+                    <p className="text-xs text-gray-500">No wallet transactions yet.</p>
+                ) : (
+                    <table className="w-full text-xs border rounded-md overflow-hidden">
+                        <thead className="bg-gray-100 text-left">
+                            <tr>
+                                <th className="px-2 py-1">Date</th>
+                                <th className="px-2 py-1">Type</th>
+                                <th className="px-2 py-1">Amount</th>
+                                <th className="px-2 py-1">Balance after</th>
+                                <th className="px-2 py-1">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {transactions.map((t) => (
+                                <tr key={t.id} className="border-t bg-white">
+                                    <td className="px-2 py-1">{dateStr(t.created_at)}</td>
+                                    <td className="px-2 py-1">{t.transaction_type}</td>
+                                    <td className={`px-2 py-1 ${t.amount < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                        {money(t.amount)}
+                                    </td>
+                                    <td className="px-2 py-1">{money(t.balance_after)}</td>
+                                    <td className="px-2 py-1">{t.notes || "—"}</td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {filteredRiders.map((rider) => (
-                                    <tr key={rider.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="py-4 px-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center border border-amber-100 text-amber-700 shrink-0 shadow-sm relative overflow-hidden">
-                                                    <Bike size={24} className="opacity-80 absolute -right-2 -bottom-2" />
-                                                    <span className="font-black text-sm relative z-10">{rider.name.charAt(0)}</span>
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-sm font-bold text-slate-900 group-hover:text-amber-700 transition-colors">{rider.name}</h3>
-                                                    <div className="flex items-center gap-2 mt-0.5 text-xs font-medium text-slate-500">
-                                                        <span className="text-[10px] font-black uppercase text-slate-400">ID: {rider.id}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                        <span>{rider.contact}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6">
-                                            <div className="flex flex-col gap-1 items-start">
-                                                <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                                                    <MapPin size={14} className="text-slate-400" /> {rider.zone}
-                                                </span>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                                    {rider.vehicleType}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6">
-                                            <div className="flex flex-col gap-1 items-start">
-                                                <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 w-max">
-                                                    <Star size={12} className="text-amber-500 fill-amber-500" />
-                                                    <span className="text-xs font-bold text-amber-900">{rider.rating.toFixed(1)}</span>
-                                                </div>
-                                                <span className="text-xs font-semibold text-slate-500">
-                                                    {rider.totalDeliveries.toLocaleString()} drops
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6">
-                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border uppercase tracking-wider ${getStatusStyle(rider.status)}`}>
-                                                {rider.status === "active" ? <Activity size={12} /> : rider.status === "blocked" ? <ShieldAlert size={12} /> : <Lock size={12}/>}
-                                                {rider.status}
-                                            </span>
-                                        </td>
-                                        <td className="py-4 px-6 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => toggleStatus(rider.id)}
-                                                    className={`p-2 rounded-xl text-xs flex items-center gap-1 transition-colors ${
-                                                        rider.status === "active"
-                                                        ? "text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                                        : "text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
-                                                    }`}
-                                                    title={rider.status === "active" ? "Suspend Courier" : "Reactivate Courier"}
-                                                >
-                                                    {rider.status === "active" ? <Lock size={18} /> : <Unlock size={18} />}
-                                                </button>
-                                                <button
-                                                    onClick={() => setSelectedRider(rider)}
-                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                                                    title="View Telemetry"
-                                                >
-                                                    <Eye size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
-            {/* Rider Details Executive Modal */}
-            <Modal isOpen={!!selectedRider} onClose={() => setSelectedRider(null)} title="Courier Telemetry Summary">
-                {selectedRider && (
-                    <div className="space-y-6">
-                         {/* Hero Section */}
-                         <div className="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg border border-slate-800">
-                            <div className="absolute right-0 top-0 opacity-10">
-                                <Navigation size={150} className="-rotate-45 translate-x-10 -translate-y-10" />
-                            </div>
-                            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                     <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 text-white backdrop-blur-sm">
-                                        <span className="font-black text-2xl">{selectedRider.name.charAt(0)}</span>
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-2xl font-black">{selectedRider.name}</h3>
-                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border bg-white/5 ${selectedRider.status === "active" ? "text-emerald-400 border-emerald-400/30" : "text-red-400 border-red-400/30"}`}>
-                                                {selectedRider.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-slate-400 font-medium text-sm flex items-center gap-2">
-                                            Node ID: {selectedRider.id}
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex gap-4 items-center">
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Wallet Reserve</p>
-                                        <p className="text-xl font-black text-amber-400">{formatCurrency(selectedRider.walletBalance)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Metrics Grid */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                                <Star size={20} className="text-amber-500 mx-auto mb-2" />
-                                <p className="text-xl font-black text-slate-900">{selectedRider.rating.toFixed(1)}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Global Rating</p>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                                <Package size={20} className="text-indigo-500 mx-auto mb-2" />
-                                <p className="text-xl font-black text-slate-900">{selectedRider.totalDeliveries.toLocaleString()}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Total Drops</p>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                                <Activity size={20} className="text-emerald-500 mx-auto mb-2" />
-                                <p className="text-xl font-black text-slate-900">
-                                     {new Date(selectedRider.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                </p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Active Since</p>
-                            </div>
-                        </div>
-
-                        {/* Technical Details */}
-                        <div className="bg-white border text-sm border-slate-100 rounded-2xl shadow-sm p-5 space-y-4">
-                             <div className="flex justify-between items-center pb-3 border-b border-slate-50">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Phone size={14} /> Comm Link</span>
-                                <span className="font-bold text-slate-900">{selectedRider.contact}</span>
-                             </div>
-                             <div className="flex justify-between items-center pb-3 border-b border-slate-50">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Mail size={14} /> Digisignature</span>
-                                <span className="font-bold text-slate-900">{selectedRider.email}</span>
-                             </div>
-                             <div className="flex justify-between items-center pb-3 border-b border-slate-50">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><MapPin size={14} /> Active Sector</span>
-                                <span className="font-bold text-slate-900">{selectedRider.zone}</span>
-                             </div>
-                             <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Bike size={14} /> Transport Type</span>
-                                <span className="font-bold text-slate-900">{selectedRider.vehicleType}</span>
-                             </div>
-                        </div>
-
-                        {/* Action Bar */}
-                        <div className="flex gap-3 pt-2">
-                             <button
-                                onClick={() => toggleStatus(selectedRider.id)}
-                                className={`flex-1 px-4 py-3 rounded-xl font-bold border transition-colors ${
-                                    selectedRider.status === "active"
-                                    ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-sm"
-                                    : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm"
-                                }`}
-                            >
-                                {selectedRider.status === "active" ? "Suspend Operations" : "Restore Clearances"}
-                            </button>
-                        </div>
-                    </div>
+            <div>
+                <h4 className="text-xs font-semibold uppercase text-gray-500 mb-2">Settlement history</h4>
+                {settlements.length === 0 ? (
+                    <p className="text-xs text-gray-500">No settlements recorded yet.</p>
+                ) : (
+                    <table className="w-full text-xs border rounded-md overflow-hidden">
+                        <thead className="bg-gray-100 text-left">
+                            <tr>
+                                <th className="px-2 py-1">Date</th>
+                                <th className="px-2 py-1">Received</th>
+                                <th className="px-2 py-1">Paid</th>
+                                <th className="px-2 py-1">Adjustment</th>
+                                <th className="px-2 py-1">Closing balance</th>
+                                <th className="px-2 py-1">Final?</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {settlements.map((s) => (
+                                <tr key={s.id} className="border-t bg-white">
+                                    <td className="px-2 py-1">{dateStr(s.created_at)}</td>
+                                    <td className="px-2 py-1">{money(s.amount_received)}</td>
+                                    <td className="px-2 py-1">{money(s.amount_paid)}</td>
+                                    <td className="px-2 py-1">{money(s.adjustment_amount)}</td>
+                                    <td className="px-2 py-1">{money(s.closing_balance)}</td>
+                                    <td className="px-2 py-1">{s.is_full_and_final ? "Yes" : "No"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 )}
-            </Modal>
+            </div>
+
+            {!showForm ? (
+                <button
+                    onClick={() => setShowForm(true)}
+                    className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
+                >
+                    Record settlement
+                </button>
+            ) : (
+                <div className="rounded-md border bg-white p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                        <label className="text-xs text-gray-600">
+                            Amount received (rider → company)
+                            <input
+                                type="number"
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={amountReceived}
+                                onChange={(e) => setAmountReceived(e.target.value)}
+                            />
+                        </label>
+                        <label className="text-xs text-gray-600">
+                            Amount paid (company → rider)
+                            <input
+                                type="number"
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={amountPaid}
+                                onChange={(e) => setAmountPaid(e.target.value)}
+                            />
+                        </label>
+                        <label className="text-xs text-gray-600">
+                            Adjustment
+                            <input
+                                type="number"
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={adjustment}
+                                onChange={(e) => setAdjustment(e.target.value)}
+                            />
+                        </label>
+                        <label className="text-xs text-gray-600">
+                            Payment mode
+                            <input
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={paymentMode}
+                                onChange={(e) => setPaymentMode(e.target.value)}
+                                placeholder="cash, upi, bank_transfer…"
+                            />
+                        </label>
+                        <label className="text-xs text-gray-600">
+                            Reference number
+                            <input
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={referenceNumber}
+                                onChange={(e) => setReferenceNumber(e.target.value)}
+                            />
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-gray-600 mt-5">
+                            <input
+                                type="checkbox"
+                                checked={isFullAndFinal}
+                                onChange={(e) => setIsFullAndFinal(e.target.checked)}
+                            />
+                            Full and final settlement
+                        </label>
+                    </div>
+                    <label className="block text-xs text-gray-600">
+                        Notes
+                        <textarea
+                            className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                        />
+                    </label>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => void submitSettlement()}
+                            disabled={submitting}
+                            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                        >
+                            {submitting ? "Saving…" : "Save settlement"}
+                        </button>
+                        <button
+                            onClick={() => setShowForm(false)}
+                            className="rounded-md border px-3 py-1.5 text-xs font-medium"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {!showAdjustmentForm ? (
+                <button
+                    onClick={() => setShowAdjustmentForm(true)}
+                    className="ml-2 rounded-md border px-3 py-1.5 text-xs font-medium"
+                >
+                    Post adjustment
+                </button>
+            ) : (
+                <div className="rounded-md border bg-white p-3 space-y-3">
+                    <p className="text-xs text-gray-500">
+                        For incentive / penalty / rider payment / company payment / COD liability,
+                        enter a positive amount — direction is applied automatically. Manual
+                        adjustment and refund reversal take the amount as entered (can be negative).
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                        <label className="text-xs text-gray-600">
+                            Type
+                            <select
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={adjustmentType}
+                                onChange={(e) => setAdjustmentType(e.target.value as WalletAdjustmentType)}
+                            >
+                                <option value="incentive">Incentive (+)</option>
+                                <option value="penalty">Penalty (−)</option>
+                                <option value="rider_payment_to_company">Rider payment to company (+)</option>
+                                <option value="company_payment_to_rider">Company payment to rider (−)</option>
+                                <option value="cod_liability">COD liability (−)</option>
+                                <option value="manual_adjustment">Manual adjustment (signed)</option>
+                                <option value="refund_reversal">Refund reversal (signed)</option>
+                            </select>
+                        </label>
+                        <label className="text-xs text-gray-600">
+                            Amount
+                            <input
+                                type="number"
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={adjustmentAmount}
+                                onChange={(e) => setAdjustmentAmount(e.target.value)}
+                            />
+                        </label>
+                        <label className="text-xs text-gray-600">
+                            Reference number
+                            <input
+                                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                                value={adjustmentReference}
+                                onChange={(e) => setAdjustmentReference(e.target.value)}
+                            />
+                        </label>
+                    </div>
+                    <label className="block text-xs text-gray-600">
+                        Notes
+                        <textarea
+                            className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                            value={adjustmentNotes}
+                            onChange={(e) => setAdjustmentNotes(e.target.value)}
+                            rows={2}
+                        />
+                    </label>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => void submitAdjustment()}
+                            disabled={adjustmentSubmitting}
+                            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                        >
+                            {adjustmentSubmitting ? "Saving…" : "Save adjustment"}
+                        </button>
+                        <button
+                            onClick={() => setShowAdjustmentForm(false)}
+                            className="rounded-md border px-3 py-1.5 text-xs font-medium"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

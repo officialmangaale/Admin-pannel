@@ -17,6 +17,7 @@ import DeactivateModal from "./DeactivateModal";
 import SettleFullModal from "./SettleFullModal";
 import SettlePartialModal from "./SettlePartialModal";
 import AdjustWalletModal from "./AdjustWalletModal";
+import RestaurantPayoutSection from "./RestaurantPayoutSection";
 
 interface Props {
     restaurantId: number;
@@ -177,6 +178,12 @@ export default function BillingTab({ restaurantId }: Props) {
                 subscriptions={subscriptionHistory}
                 loading={loadingHistory}
             />
+
+            {/* Section: Order-Revenue Payout Ledger + Credit Limit (Module 12) */}
+            <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Payouts &amp; Credit Limit</h3>
+                <RestaurantPayoutSection restaurantId={restaurantId} />
+            </div>
 
             {/* ── Action Modals ────────────────────────────────────────── */}
             <ActivatePlanModal
