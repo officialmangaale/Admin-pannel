@@ -209,7 +209,7 @@ export default function WalletPage() {
                           It likely renders a Recharts line/area chart.
                         */}
                         <div className="absolute inset-x-0 bottom-0 h-full w-full opacity-90">
-                            <RevenueChart />
+                            <RevenueChart data={[]} />
                         </div>
                     </div>
                 </div>

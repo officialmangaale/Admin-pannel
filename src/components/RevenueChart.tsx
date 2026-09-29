@@ -10,27 +10,22 @@ import {
     CartesianGrid,
 } from "recharts";
 
-const data = [
-    { date: "10 Mar", revenue: 500 },
-    { date: "11 Mar", revenue: 800 },
-    { date: "12 Mar", revenue: 1500 },
-    { date: "13 Mar", revenue: 700 },
-    { date: "14 Mar", revenue: 900 },
-    { date: "15 Mar", revenue: 1200 },
-    { date: "16 Mar", revenue: 1800 },
-];
+export interface RevenueTrendPoint {
+    date: string;
+    amount: number;
+}
 
-export default function RevenueChart() {
+export default function RevenueChart({ data }: { data: RevenueTrendPoint[] }) {
     return (
         <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={(value: number) => `₹${value.toFixed(2)}`} />
                 <Line
                     type="monotone"
-                    dataKey="revenue"
+                    dataKey="amount"
                     stroke="#facc15"
                     strokeWidth={3}
                 />
