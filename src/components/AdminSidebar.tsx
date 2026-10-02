@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Store, Eye, Calendar, Wallet, Settings, X, User, Bike, CreditCard, Images, Gift, ShoppingBasket, Truck, Percent, Tag, Receipt, Ticket, BarChart3, TrendingUp, ShieldCheck, FileDown } from "lucide-react";
+import { Home, ShoppingBag, Store, Eye, X, User, Bike, CreditCard, Images, Gift, ShoppingBasket, Truck, Percent, Tag, Receipt, Ticket, BarChart3, TrendingUp, ShieldCheck, FileDown, Send, LifeBuoy } from "lucide-react";
 
 export default function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const pathname = usePathname();
@@ -15,6 +15,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/markup-rules", label: "Markup Rules", icon: <Tag size={20} /> },
         { href: "/fee-rules", label: "Fee Rules", icon: <Receipt size={20} /> },
         { href: "/coupons", label: "Coupons", icon: <Ticket size={20} /> },
+        { href: "/push-campaigns", label: "Push Campaigns", icon: <Send size={20} /> },
         { href: "/grocery-shops", label: "Grocery Shops", icon: <ShoppingBasket size={20} /> },
         { href: "/grocery-categories", label: "Grocery Categories", icon: <ShoppingBasket size={20} /> },
         { href: "/pos/app-assets", label: "POS Branding", icon: <Images size={20} /> },
@@ -22,13 +23,11 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
         { href: "/user-analytics", label: "User Analytics", icon: <BarChart3 size={20} /> },
         { href: "/profitability", label: "Profitability", icon: <TrendingUp size={20} /> },
         { href: "/riders", label: "Riders", icon: <Bike size={20} /> },
-        { href: "/wallet", label: "Wallet", icon: <Wallet size={20} /> },
+        { href: "/rider-support", label: "Rider Support", icon: <LifeBuoy size={20} /> },
         { href: "/referrals", label: "Referrals", icon: <Gift size={20} /> },
         { href: "/history", label: "Audit Log", icon: <Eye size={20} /> },
         { href: "/reports", label: "Reports", icon: <FileDown size={20} /> },
         { href: "/admin-roles", label: "Admin Roles", icon: <ShieldCheck size={20} /> },
-        { href: "/calendar", label: "Calendar", icon: <Calendar size={20} /> },
-        { href: "/settings", label: "Settings", icon: <Settings size={20} /> },
     ];
 
     const billingItems = [
