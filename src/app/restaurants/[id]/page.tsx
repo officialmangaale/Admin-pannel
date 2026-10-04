@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { 
     ArrowLeft, Store, MapPin, Phone, Mail, Clock, Calendar, 
     CheckCircle2, AlertCircle, ShoppingBag, Wallet, FileText, 
-    Settings, Star, Tag, QrCode, Shield, Activity, Share2, Copy, FileCheck, Download
+    Settings, Star, Tag, QrCode, Shield, Activity, Share2, Copy, FileCheck, Download, SlidersHorizontal
 } from "lucide-react";
 import { restaurantApi, Restaurant } from "@/lib/api";
 import BillingTab from "@/components/billing/BillingTab";
+import RestaurantFeaturesPanel from "@/components/RestaurantFeaturesPanel";
 
 const tabs = [
     { id: "overview", label: "Overview", icon: Store },
@@ -19,6 +20,7 @@ const tabs = [
     { id: "reviews", label: "Reviews", icon: Star },
     { id: "offers", label: "Offers", icon: Tag },
     { id: "qr", label: "QR & Table", icon: QrCode },
+    { id: "features", label: "Features", icon: SlidersHorizontal },
     { id: "kyc", label: "KYC Documents", icon: Shield },
     { id: "history", label: "Activity History", icon: Activity },
     { id: "settings", label: "Settings", icon: Settings },
@@ -324,7 +326,11 @@ export default function RestaurantDetails() {
                         <BillingTab restaurantId={restaurant.id} />
                     )}
 
-                    {activeTab !== 'overview' && activeTab !== 'kyc' && activeTab !== 'wallet' && (
+                    {activeTab === 'features' && restaurant && (
+                        <RestaurantFeaturesPanel restaurantId={restaurant.id} />
+                    )}
+
+                    {activeTab !== 'overview' && activeTab !== 'kyc' && activeTab !== 'wallet' && activeTab !== 'features' && (
                         <div className="flex flex-col items-center justify-center min-h-[400px] text-center animate-in fade-in duration-500">
                             <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center mb-6 border border-amber-100 shadow-inner">
                                 <Settings size={32} className="text-amber-400" />

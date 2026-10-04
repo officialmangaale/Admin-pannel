@@ -220,6 +220,52 @@ export interface UpdateRestaurantFiles {
     pan_card_url?: File;
 }
 
+export interface FeatureDefinition {
+    key: string;
+    display_name: string;
+    description: string;
+    category: string;
+    restaurant_toggleable: boolean;
+    default_existing_behavior: boolean;
+    active: boolean;
+}
+
+export interface RestaurantFeatureState {
+    key: string;
+    display_name: string;
+    description: string;
+    category: string;
+    restaurant_toggleable: boolean;
+    default_existing_behavior: boolean;
+    active: boolean;
+    entitled: boolean;
+    enabled: boolean;
+    effective: boolean;
+    dependencies: string[];
+    blocked_by?: string[];
+}
+
+export interface RestaurantFeatureSnapshot {
+    restaurant_id: number;
+    features: Record<string, RestaurantFeatureState>;
+}
+
+export interface FeatureListResponse {
+    success?: boolean;
+    status?: string;
+    message?: string;
+    data: {
+        features: FeatureDefinition[];
+    };
+}
+
+export interface RestaurantFeatureResponse {
+    success?: boolean;
+    status?: string;
+    message?: string;
+    data: RestaurantFeatureSnapshot;
+}
+
 export interface CreateRoleRequest {
     name: string;
     description: string;
@@ -667,6 +713,39 @@ export const restaurantApi = {
         return apiRequest<{ status: string; message: string }>(`/admin/restaurants/${id}`, {
             method: 'DELETE',
         }, RESTAURANT_API_BASE_URL);
+    },
+};
+
+export const featureApi = {
+    listDefinitions: async (): Promise<FeatureDefinition[]> => {
+        const res = await apiRequest<FeatureListResponse>(
+            `/admin/features`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data?.features ?? [];
+    },
+
+    getRestaurantFeatures: async (restaurantId: number): Promise<RestaurantFeatureSnapshot> => {
+        const res = await apiRequest<RestaurantFeatureResponse>(
+            `/admin/restaurants/${restaurantId}/features`,
+            { method: 'GET' },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data;
+    },
+
+    setRestaurantEntitlement: async (
+        restaurantId: number,
+        featureKey: string,
+        enabled: boolean
+    ): Promise<RestaurantFeatureSnapshot> => {
+        const res = await apiRequest<RestaurantFeatureResponse>(
+            `/admin/restaurants/${restaurantId}/features/${featureKey}`,
+            { method: 'PATCH', body: JSON.stringify({ enabled }) },
+            RESTAURANT_API_BASE_URL
+        );
+        return res.data;
     },
 };
 
