@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Images, Loader2, RefreshCw } from "lucide-react";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 import AppAssetCard from "@/components/pos/AppAssetCard";
 import Toast from "@/components/Toast";
-import { restaurantApi, type Restaurant } from "@/lib/api";
 import { useToast } from "@/lib/useToast";
 import {
   posAppAssetsService,
@@ -52,7 +52,6 @@ const assetCards: Array<{
 
 export default function PosAppAssetsPage() {
   const { toast, showToast, hideToast } = useToast();
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<string>("global");
   const [assets, setAssets] = useState<PosAppAssetsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,15 +69,6 @@ export default function PosAppAssetsPage() {
     return map;
   }, [assets]);
 
-  const loadRestaurants = async () => {
-    try {
-      const response = await restaurantApi.getAll({ page: 1, limit: 200 });
-      setRestaurants(response.data.items || []);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to load restaurants", "error");
-    }
-  };
-
   const loadAssets = async () => {
     setLoading(true);
     setError(null);
@@ -93,10 +83,6 @@ export default function PosAppAssetsPage() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadRestaurants();
-  }, []);
 
   useEffect(() => {
     loadAssets();
@@ -187,21 +173,12 @@ export default function PosAppAssetsPage() {
       </div>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          Restaurant
-        </label>
-        <select
-          value={selectedRestaurant}
-          onChange={(event) => setSelectedRestaurant(event.target.value)}
-          className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-        >
-          <option value="global">Global Default</option>
-          {restaurants.map((restaurant) => (
-            <option key={restaurant.id} value={restaurant.id}>
-              {restaurant.name} #{restaurant.id}
-            </option>
-          ))}
-        </select>
+        <RestaurantSearchSelect
+          label="Restaurant"
+          value={selectedRestaurantId}
+          onChange={(id) => setSelectedRestaurant(id ? String(id) : "global")}
+          placeholder="Global default, or search restaurant"
+        />
       </section>
 
       {loading ? (

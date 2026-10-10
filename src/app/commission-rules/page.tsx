@@ -13,6 +13,7 @@ import {
 } from "@/services/commissionRuleService";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 
 const emptyRule: CommissionRuleInput = {
     rule_type: "percentage",
@@ -132,13 +133,12 @@ export default function CommissionRulesPage() {
                 </button>
             </div>
 
-            <div className="rounded-lg border p-4 flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">Restaurant ID (optional)</label>
-                <input
-                    className="w-40 rounded-md border px-3 py-2 text-sm"
-                    placeholder="Global default"
-                    value={restaurantId}
-                    onChange={(e) => setRestaurantId(e.target.value.replace(/[^0-9]/g, ""))}
+            <div className="rounded-lg border p-4 flex flex-col gap-3 md:flex-row md:items-end">
+                <RestaurantSearchSelect
+                    label="Restaurant scope (optional)"
+                    value={scopedRestaurantId ?? null}
+                    onChange={(id) => setRestaurantId(id ? String(id) : "")}
+                    placeholder="Global default, or search restaurant"
                 />
                 <span className="text-xs text-gray-500">
                     {scopedRestaurantId ? `Editing restaurant ${scopedRestaurantId}'s own rules` : "Editing the global default"}

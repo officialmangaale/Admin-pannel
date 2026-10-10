@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 import { downloadReportCSV, REPORTS, ReportField } from "@/services/reportsService";
 
 /**
@@ -118,12 +119,11 @@ export default function ReportsPage() {
 
                     {has("restaurant_id") && (
                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Restaurant ID</label>
-                            <input
-                                className="w-full rounded-md border px-3 py-2 text-sm"
+                            <RestaurantSearchSelect
+                                label="Restaurant"
+                                value={restaurantId ? Number(restaurantId) : null}
+                                onChange={(id) => setRestaurantId(id ? String(id) : "")}
                                 placeholder="All restaurants"
-                                value={restaurantId}
-                                onChange={(e) => setRestaurantId(e.target.value)}
                             />
                         </div>
                     )}

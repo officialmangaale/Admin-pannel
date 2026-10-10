@@ -14,6 +14,7 @@ import {
 } from "@/services/markupRuleService";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 
 const emptyRule: ItemMarkupRuleInput = {
     scope: "global",
@@ -161,7 +162,17 @@ export default function MarkupRulesPage() {
                             <option value="item">Item</option>
                         </select>
                     </Field>
-                    {newRule.scope !== "global" && (
+                    {newRule.scope === "restaurant" && (
+                        <div className="md:col-span-2">
+                            <RestaurantSearchSelect
+                                label="Restaurant"
+                                value={newRule.restaurant_id ?? null}
+                                onChange={(id) => setNewRule({ ...newRule, restaurant_id: id })}
+                                placeholder="Search restaurant"
+                            />
+                        </div>
+                    )}
+                    {newRule.scope !== "global" && newRule.scope !== "restaurant" && (
                         <Field label={`${newRule.scope} id`}>
                             <input
                                 className="w-full rounded-md border px-3 py-2 text-sm"

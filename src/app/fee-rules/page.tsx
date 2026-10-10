@@ -13,11 +13,12 @@ import {
 } from "@/services/feeRuleService";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 
 const emptyRule: DynamicFeeRuleInput = {
-    fee_code: "",
-    fee_name: "",
-    customer_title: "",
+    fee_code: "platform_fee",
+    fee_name: "Platform Fee",
+    customer_title: "Platform Fee",
     description: "",
     rule_type: "fixed",
     rate_permille: 0,
@@ -28,6 +29,8 @@ const emptyRule: DynamicFeeRuleInput = {
     priority: 0,
 };
 
+const MAX_PERCENT_FEE = 100;
+
 /**
  * Platform Fee and Additional Charges (platform upgrade Module 5).
  *
@@ -37,8 +40,8 @@ const emptyRule: DynamicFeeRuleInput = {
  * rule overrides the global one for that restaurant. The customer_title is
  * what the app renders — nothing about fee names is hardcoded client-side.
  *
- * Not wired into live checkout yet — see
- * restaurant-service/services/fee_pricing.go for why.
+ * Customer-facing platform fee uses fee_code="platform_fee"; subscription
+ * PER_ORDER billing is internal and must not be entered here.
  */
 export default function FeeRulesPage() {
     const { toast, showToast, hideToast } = useToast();
@@ -70,8 +73,9 @@ export default function FeeRulesPage() {
     }, [load]);
 
     const create = async () => {
-        if (!newRule.fee_code.trim() || !newRule.fee_name.trim() || !newRule.customer_title.trim()) {
-            showToast("Fee code, name, and customer title are required", "error");
+        const validation = validateFeeRuleInput(newRule);
+        if (validation) {
+            showToast(validation, "error");
             return;
         }
         setSaving("new");
@@ -88,6 +92,11 @@ export default function FeeRulesPage() {
     };
 
     const save = async (rule: DynamicFeeRule, input: DynamicFeeRuleInput) => {
+        const validation = validateFeeRuleInput(input);
+        if (validation) {
+            showToast(validation, "error");
+            return;
+        }
         setSaving(rule.id);
         try {
             await updateFeeRule(rule.id, { ...input, restaurant_id: rule.restaurant_id ?? null, category_id: rule.category_id ?? null });
@@ -134,13 +143,12 @@ export default function FeeRulesPage() {
                 </button>
             </div>
 
-            <div className="rounded-lg border p-4 flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">Restaurant ID (optional)</label>
-                <input
-                    className="w-40 rounded-md border px-3 py-2 text-sm"
-                    placeholder="Global default"
-                    value={restaurantId}
-                    onChange={(e) => setRestaurantId(e.target.value.replace(/[^0-9]/g, ""))}
+            <div className="rounded-lg border p-4 flex flex-col gap-3 md:flex-row md:items-end">
+                <RestaurantSearchSelect
+                    label="Restaurant scope (optional)"
+                    value={scopedRestaurantId ?? null}
+                    onChange={(id) => setRestaurantId(id ? String(id) : "")}
+                    placeholder="Global default, or search restaurant"
                 />
                 <span className="text-xs text-gray-500">
                     {scopedRestaurantId ? `Editing restaurant ${scopedRestaurantId}'s own rules` : "Editing the global default"}
@@ -330,6 +338,22 @@ export default function FeeRulesPage() {
             )}
         </div>
     );
+}
+
+function validateFeeRuleInput(input: DynamicFeeRuleInput): string | null {
+    if (!input.fee_code.trim() || !input.fee_name.trim() || !input.customer_title.trim()) {
+        return "Fee code, name, and customer title are required";
+    }
+    if (input.fee_code.trim().toLowerCase() === "per_order") {
+        return "PER_ORDER is reserved for restaurant subscription billing. Use platform_fee for customer fees.";
+    }
+    if (input.rate_permille < 0 || input.fixed_amount_cents < 0) {
+        return "Fee amount cannot be negative";
+    }
+    if (input.rule_type === "percentage" && input.rate_permille > MAX_PERCENT_FEE * 10) {
+        return `Percentage fee cannot exceed ${MAX_PERCENT_FEE}%`;
+    }
+    return null;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -15,6 +15,7 @@ import {
 } from "@/services/pushCampaignService";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import { UserSearchSelect } from "@/components/admin-search-selects";
 
 const TITLE_MAX = 65;
 const BODY_MAX = 240;
@@ -38,7 +39,7 @@ export default function PushCampaignsPage() {
     const [itemType, setItemType] = useState<PushItemType>("grocery");
     const [productId, setProductId] = useState("");
     const [audience, setAudience] = useState<PushAudienceType>("user_ids");
-    const [userIdsText, setUserIdsText] = useState("");
+    const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
     const [confirmAll, setConfirmAll] = useState(false);
 
     const [audienceSize, setAudienceSize] = useState<number | null>(null);
@@ -63,7 +64,11 @@ export default function PushCampaignsPage() {
             audience_type: audience,
         };
         if (audience === "user_ids") {
-            input.user_ids = userIdsText.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+            if (selectedUserIds.length === 0) {
+                showToast("Select at least one customer", "error");
+                return null;
+            }
+            input.user_ids = selectedUserIds;
         } else {
             input.confirm_all_customers = confirmAll;
         }
@@ -186,10 +191,13 @@ export default function PushCampaignsPage() {
                         </select>
                     </label>
                     {audience === "user_ids" ? (
-                        <label className="block text-sm">
-                            Customer user IDs (comma or line separated)
-                            <textarea className="mt-1 w-full rounded border px-3 py-2 font-mono text-xs" rows={3} value={userIdsText} onChange={(e) => setUserIdsText(e.target.value)} />
-                        </label>
+                        <UserSearchSelect
+                            label="Customers"
+                            value={selectedUserIds}
+                            onChange={setSelectedUserIds}
+                            type="customer"
+                            status="active"
+                        />
                     ) : (
                         <label className="flex items-start gap-2 rounded bg-amber-50 p-3 text-sm text-amber-900">
                             <input type="checkbox" className="mt-1" checked={confirmAll} onChange={(e) => setConfirmAll(e.target.checked)} />

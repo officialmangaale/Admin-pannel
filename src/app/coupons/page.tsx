@@ -16,6 +16,7 @@ import {
 } from "@/services/adminCouponService";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/useToast";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 
 const emptyRule: AdminCouponInput = {
     restaurant_id: 0,
@@ -152,24 +153,25 @@ export default function AdminCouponsPage() {
                 </button>
             </div>
 
-            <div className="rounded-lg border p-4 flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">Restaurant ID</label>
-                <input
-                    className="w-40 rounded-md border px-3 py-2 text-sm"
-                    placeholder="All restaurants"
-                    value={restaurantId}
-                    onChange={(e) => setRestaurantId(e.target.value.replace(/[^0-9]/g, ""))}
+            <div className="rounded-lg border p-4 flex flex-col gap-3 md:flex-row md:items-end">
+                <RestaurantSearchSelect
+                    label="Restaurant filter"
+                    value={scopedRestaurantId ?? null}
+                    onChange={(id) => setRestaurantId(id ? String(id) : "")}
+                    placeholder="All restaurants, or search restaurant"
                 />
-                <label className="text-sm font-medium text-gray-700">Status</label>
-                <select
-                    className="rounded-md border px-3 py-2 text-sm"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                    <option value="">All</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700">
+                    Status
+                    <select
+                        className="mt-1 block rounded-md border px-3 py-2 text-sm"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="">All</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </label>
             </div>
 
             <div className="rounded-lg border p-4 space-y-3">
@@ -180,14 +182,15 @@ export default function AdminCouponsPage() {
                     </div>
                 )}
                 <div className="grid gap-3 md:grid-cols-4">
-                    <Field label="Restaurant ID">
-                        <input
-                            type="number"
-                            className="w-full rounded-md border px-3 py-2 text-sm"
-                            value={newCoupon.restaurant_id || ""}
-                            onChange={(e) => setNewCoupon({ ...newCoupon, restaurant_id: Number(e.target.value) })}
+                    <div className="md:col-span-2">
+                        <RestaurantSearchSelect
+                            label="Restaurant"
+                            value={newCoupon.restaurant_id || null}
+                            onChange={(id) => setNewCoupon({ ...newCoupon, restaurant_id: id ?? 0 })}
+                            placeholder="Search restaurant for this coupon"
+                            allowClear={false}
                         />
-                    </Field>
+                    </div>
                     <Field label="Code">
                         <input
                             className="w-full rounded-md border px-3 py-2 text-sm"
