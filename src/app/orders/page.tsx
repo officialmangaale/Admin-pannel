@@ -8,6 +8,7 @@ import {
     X, RefreshCw, Download, Receipt, Calendar, QrCode, Activity, Phone, MapPin, UserCheck
 } from "lucide-react";
 import Modal from "@/components/Modal";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 import { orderApi, Order, OrderFilters, OrderStatus, OrderDetails } from "@/lib/api";
 
 const ORDER_STATUSES: { value: string; label: string; color: string; bg: string; border: string; iconBase: string }[] = [
@@ -310,8 +311,12 @@ export default function OrdersPage() {
                                 </select>
                             </div>
                             <div className="space-y-1 lg:col-span-1">
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Node ID</label>
-                                <input type="text" placeholder="e.g. 1045" value={restaurantId} onChange={(e) => setRestaurantId(e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all outline-none text-sm font-semibold shadow-sm" />
+                                <RestaurantSearchSelect
+                                    label="Restaurant"
+                                    value={restaurantId ? Number(restaurantId) : null}
+                                    onChange={(id) => setRestaurantId(id ? String(id) : "")}
+                                    placeholder="All restaurants"
+                                />
                             </div>
                             <div className="space-y-1 lg:col-span-1">
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">From Epoch</label>

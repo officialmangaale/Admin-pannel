@@ -11,6 +11,7 @@ import {
     getOrderProfitability,
     getProfitabilityRollup,
 } from "@/services/profitabilityService";
+import { RestaurantSearchSelect } from "@/components/admin-search-selects";
 
 const DIMENSIONS: { value: ProfitabilityDimension; label: string }[] = [
     { value: "restaurant", label: "By restaurant" },
@@ -155,11 +156,11 @@ export default function ProfitabilityPage() {
                             </option>
                         ))}
                     </select>
-                    <input
-                        className="rounded-md border px-3 py-2 text-sm"
-                        placeholder="Restaurant ID (optional)"
-                        value={restaurantId}
-                        onChange={(e) => setRestaurantId(e.target.value.replace(/[^0-9]/g, ""))}
+                    <RestaurantSearchSelect
+                        label="Restaurant"
+                        value={restaurantId ? Number(restaurantId) : null}
+                        onChange={(id) => setRestaurantId(id ? String(id) : "")}
+                        placeholder="All restaurants"
                     />
                     <input
                         type="date"
