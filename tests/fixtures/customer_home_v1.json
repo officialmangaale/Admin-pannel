@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "renderer_version": 1,
+  "screen": "delivery_home",
+  "mode": "food",
+  "style": {
+    "page_background": "pageTint",
+    "section_heading": "ink",
+    "accent": "primary",
+    "banner_background": "ink"
+  },
+  "sections": [
+    { "id": "categories", "type": "category_rail", "source": "categories", "visible": true, "heading": "What's on your mind?" },
+    { "id": "banners", "type": "banner_carousel", "source": "home_banners", "visible": true, "heading": "", "editorial_banners": [
+      { "id": "explore", "title": "Find your next favourite", "subtitle": "Explore nearby restaurants", "image_url": "", "cta_text": "Explore", "destination": { "type": "search", "query": "" } }
+    ] },
+    { "id": "popular-restaurants", "type": "restaurant_rail", "source": "popular_restaurants", "visible": true, "heading": "Popular near you" },
+    { "id": "restaurants", "type": "restaurant_list", "source": "restaurants", "visible": true, "heading": "All restaurants" },
+    { "id": "popular-dishes", "type": "product_rail", "source": "featured_items", "visible": true, "heading": "Popular dishes" }
+  ]
+}
